@@ -41,7 +41,9 @@ Dependencies:
             conda install -c bioconda nanofilt
             
         Source: https://github.com/wdecoster/nanofilt
-        
+   
+    Samtools
+    
     ______________________________________________________________________
     BulkPlasmidSeq usage examples (Not updated ):
     

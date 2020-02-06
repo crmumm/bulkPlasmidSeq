@@ -6,9 +6,9 @@ import subprocess
 
 def main():
     '''
-    See dependencies at the bottom:
+    See dependencies in accompanying text file.
     
-    BulkPlasmidSeq usage examples (Not updated ):
+    BulkPlasmidSeq usage examples (Not updated with Porechop implementation):
     
     For filtered sequences with known reference sequence:
     
@@ -31,7 +31,7 @@ def main():
         
         sys.exit('Porechop has no option "reference". If you would like to bin with Porechop'
                  'and also polish with medaka, please only specify -r or -BC'
-                'The same set of seq will be used for both. Thanks!')
+                'The same set of seqs will be used for both.')
     
     if args.porechop:
         runPorechop(reads, outputDir, args.barcodes, args.barcode_threshold,
@@ -171,90 +171,82 @@ def processMedakaOutput(outputDir, porechop):
         
         
 def runPorechop(reads, outputDir, barcodes, barcodeThreshold, threads, endSize, medaka, iterations):
-    outputDirFirst = outputDir+'_0'
-    if not os.path.isdir(outputDirFirst):
-            os.makedirs(outputDirFirst)
-    detailsOut = open(os.path.join(outputDirFirst, 'PorechopRunDetails.txt'), 'wt')
-    detailsOut.write('Porechop run details \nInput files: %s \nBarcodes: %s \nOutput Directory:'
-                     '%s \nBarcode Threshold: %s \nThreads: %s \nEnd Size: %s \nMedaka: %s \n'
-         % (reads, barcodes, outputDirFirst, barcodeThreshold, str(threads), str(endSize), str(medaka)))
+    #print('Pretending to run Porechop here, processing existing directories')
+    if not os.path.isdir(outputDir):
+            os.makedirs(outputDir)
+    detailsOut = open(os.path.join(outputDir, 'PorechopRunDetails.txt'), 'wt')
     
-    for x in range(int(iterations)):
-        baseRun = 'porechop -i %s -b %s -BC %s -t %s --barcode_threshold %s --no_split --untrimmed -v 0 --end_size 1000'
-        subprocess.run([baseRun % (reads, outputDir+'_'+str(x), barcodes, str(threads), str(barcodeThreshold))], shell = True)
+    detailsOut.write('Porechop run details \nInput files: %s \nBarcodes: %s \nOutput Directory:'
+                     '%s \nBarcode Threshold: %s \nThreads: %s \nEnd Size: %s \nMedaka: %s \nInterations %s\n'
+         % (reads, barcodes, outputDir, barcodeThreshold, str(threads), str(endSize), str(medaka), str(iterations)))
     
     detailsOut.close()
+    
+    for x in range(int(iterations)):
         
+        baseRun = 'porechop -i %s -b %s -BC %s -t %s --barcode_threshold %s \
+        --no_split --untrimmed -v 0 --end_size %s --discard_unassigned'
+        
+        if x == 0:  
+            subprocess.run([baseRun % (reads, outputDir_0, barcodes, str(threads),
+                                       str(barcodeThreshold), str(endSize))], shell = True)
+            
+        else:
+            subprocess.run([baseRun % (reads, outputDir+'_'+str(x), barcodes, str(threads),
+                                       str(barcodeThreshold), str(endSize))], shell = True)
     
     if medaka:
         
         runMedaka(reads, reference, barcodes, threads, porechop = True)
         
-        
+    processPorechopOutput(outputDir, iterations, barcodes)
+    
     return
 
-def processPorechopOutput(details):
-    pass
+def processPorechopOutput(outputDir, iterations, barcodes):
     
+    paths = [path for path in os.listdir('.') if path.startswith(outputDir)]
     
+    if len(paths) != int(iterations):
+        
+        sys.exit('Number of directories is not the same as number of iterations, one or more'
+                'rounds of Porechop likely failed, try again with new parameters (--end_size) recommended')
+    
+    else:
+        
+        #barcodes = [BC for BC in os.listdir(paths[0]) if BC.startswith('BC')]
+        
+        finalOutput = outputDir + '_Final'
+        
+        os.mkdir(finalOutput)
+        
+        finalFastq = open('allBinned.fastq', 'wt')
+        
+        
+        for directory in paths:
+            
+            subprocess.run(['cat %s/*.fastq >> %s/allBinned.fastq' % (directory, finalOutput)], shell = True)
+            #subprocess.run(['rm -r %s' % directory], shell = True)
+        
+        finalFastq.close()
+        
+        runMinimap2(outputDir, barcodes)
+        
+    return 
+
+        
+def runMinimap2(outputDir, reference):
+    
+    finalReads = outputDir + '_Final/allBinned.fastq'
+    
+    minimap2Run = 'minimap2 -ax map-ont %s %s | samtools sort -o %s'
+    
+    #samtoolsRun = 'samtools sort | samtools view -q > %s/filtered_sorted_binned_reads.sam'
+    
+    subprocess.run([minimap2Run % (reference, finalReads, outputDir+'_Final/sorted_reads.sam')], shell = True)
+        
+    return 
        
 if __name__ == "__main__":
-    '''
-        Dependencies:
-    
-    All require Python 3, please see software sources for more detailed requirements
-    
-    Medaka
-    
-        Prefered installation - Using a virtual environment, takes care of medaka dependencies:
 
-            conda create -n medaka -c conda-forge -c bioconda medaka
-            
-            conda activate medaka
-
-            --------------------------------------------------------------
-
-            virtualenv medaka --python=python3 --prompt "(medaka) "
-            . medaka/bin/activate
-            pip install medaka
-            
-        Source: https://github.com/nanoporetech/medaka
-        
-    Porechop
-    
-        Porechop is officially unsupported by Nanopore, but is one of the better tools if using custom barcodes. 
-        Note, as of 20200204, new branch PorechopCustom with barcoding.py and edited porechop.py
-    
-            git clone https://github.com/rrwick/Porechop.git
-            cd Porechop
-            python3 setup.py install
-            
-        Source: https://github.com/rrwick/Porechop
-            
-    NanoFilt
-    
-        Stuff
-            
-            pip install nanofilt
-            pip install nanofilt --upgrade
-           
-            --------------------------------------------------------------
-            
-            conda install -c bioconda nanofilt
-            
-        Source: https://github.com/wdecoster/nanofilt
-        
-    ______________________________________________________________________
-    BulkPlasmidSeq usage examples (Not updated ):
-    
-    For filtered sequences with known reference sequence:
-    
-        python bulkPlasmidSeq.py -i my_reads.fastq -r my_plasmid_genome.fa -o output_directory -t 4
-  
-        python bulkPlasmidSeq.py -i path/to/reads -r path/to/plasmids
-        
-    For unfiltered reads - Guppy filters to Q7 ~85% basecalling accuracy:
-    
-        python bulkPlasmidSeq.py -i my_reads.fastq -r my_plasmid_genome.fa -q 8 
-    '''
     main()
