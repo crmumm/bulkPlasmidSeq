@@ -3,6 +3,7 @@ import os
 import sys
 import shutil
 import subprocess
+import time
 
 def main():
     '''
@@ -10,16 +11,23 @@ def main():
     
     BulkPlasmidSeq usage examples (Not updated with Porechop implementation):
     
-    For filtered sequences with known reference sequence:
+    For alignment, polishing, and creating consensus without binning (Medaka):
     
-        python bulkPlasmidSeq.py -i my_reads.fastq -r my_plasmid_genome.fa -o output_directory -t 4
-  
-        python bulkPlasmidSeq.py -i path/to/reads -r path/to/plasmids
-        
-    For unfiltered reads - Guppy filters to Q7 ~85% basecalling accuracy:
+        python bulkPlasmidSeq.py -i 'path/to/reads' -r 'path/to/plasmids' -o outputDirectory  -M
     
-        python bulkPlasmidSeq.py -i my_reads.fastq -r my_plasmid_genome.fa -q 8 
+    For binning and alignment (Porechop):
+    
+        python bulkPlasmidSeq.py -i 'path/to/reads' -o outputDirectory -BC 'path/to/plasmids' -P
         
+        python bulkPlasmidSeq.py -i 'path/to/reads' -o outputDirectory -BC 'path/to/plasmids' -P --end_size 1000 -N 3
+        
+    For binnning, followed by alignment, polishing and outputting consensus (Medaka and Porechop):
+    
+        python bulkPlasmidSeq.py -i 'path/to/reads' -o outputDirectory -r 'path/to/plasmids' -MP
+        
+        python bulkPlasmidSeq.py -i 'path/to/reads' -o outputDirectory -r 'path/to/plasmids' -MP --end_size 500 -N 5
+        
+    For binning and alignment (Porechop)
         
         
     '''
@@ -27,18 +35,41 @@ def main():
     
     reads, reference, outputDir = loadReads(args.input_reads, args.reference, args.output_dir)
     
-    if args.porechop and reference is not None:
-        
-        sys.exit('Porechop has no option "reference". If you would like to bin with Porechop'
-                 'and also polish with medaka, please only specify -r or -BC'
-                'The same set of seqs will be used for both.')
+    if args.nanofilt:
+        '''
+        Runs Nanofilt with specified filters, updates reads to use for downstream analysis
+        If none of the defaults are changed, tell the user and tell them to change min_length to something different
+        To ignore this check
+        '''
+        if args.max_length == 100000 and args.min_length == 0 and args.min_quality == 7:
+            sys.exit('No arguments given for nanofilt, will not filter out anything from your reads unless'
+                     'you are using failed reads from Guppy. If using failed reads use --min_length 1')
+            
+        reads = filterReads(reads, args.max_length, args.min_length, args.min_quality, args.porechop, args.medaka)
     
     if args.porechop:
-        runPorechop(reads, outputDir, args.barcodes, args.barcode_threshold,
-                              args.threads, args.end_size, args.medaka, args.porechop_iterations)
+        #Check the inputs
+        if None not in (outputDir, args.barcodes):
+            runPorechop(reads, outputDir, args.barcodes, args.barcode_threshold,
+                        args.threads, args.end_size, args.medaka, args.porechop_iterations)
+            
+        elif reference is not None:
+            sys.exit('Porechop has no option "reference". Please use -BC which will be used for barcoding and reference')
+            
+        else:
+            sys.exit('Porechop needs input reads (-i), output directory (-o), and barcodes (-BC)')
     
     if args.medaka and args.porechop == False:
-        runMedaka(reads, reference, outputDir, args.threads, args.porechop)
+        
+        if None not in (reads, reference, outputDir):
+            runMedaka(reads, reference, outputDir, args.threads, args.porechop)
+            
+        elif args.barcodes is not None:
+            sys.exit('If you are looking for consensus building without binning (Medaka) use -r for reference, not -BC')
+        
+        else:
+            sys.exit('Porechop needs input reads (-i), output directory (-o), and reference sequences (-r)')
+    
     
 
 def getArgs():
@@ -57,13 +88,15 @@ def getArgs():
     mainArgs.add_argument('-r', '--reference', required=False,
                           help = 'plasmid sequences (directory or .fa)')
     mainArgs.add_argument('-o', '--output_dir', required = False,
-                          help = 'output directory for medaka')
+                          help = 'output directory')
     mainArgs.add_argument('-t', '--threads', required = False, default = 2,
-                          help = 'number of threads for medaka, default 2')
+                          help = 'number of threads, default 2')
     mainArgs.add_argument('-M', '--medaka', action = 'store_true', required = False,
                           help = 'Run medaka')
     mainArgs.add_argument('-P', '--porechop', action = 'store_true', required = False,
                           help = 'Bin reads using porechop')
+    mainArgs.add_argument('-F', '--nanofilt', action = 'store_true', required = False, 
+                         help = 'Filter reads with NanoFilt')
     
     porechopArgs = ap.add_argument_group('Porechop Options')
     porechopArgs.add_argument('--barcode_threshold', required = False, default = 75)
@@ -72,20 +105,23 @@ def getArgs():
     porechopArgs.add_argument('-N', '--porechop_iterations', required = False, default = 1,
                               help = 'Number of rounds of Porechop binning')
     
+    nanofilt = ap.add_argument_group('Nanofilt arguments')
+    nanofilt.add_argument('--max_length', required = False, default = 100000, help = 'Filtering reads by maximum length')
+    nanofilt.add_argument('--min_length', required = False, default = 0,  help = 'Filtering reads by minimum length')
+    nanofilt.add_argument('-q', '--min_quality', required = False, default = 7, help = 'Filter reads by quality score > N')
+    
 
     args = ap.parse_args()
                 
-    if args.medaka and args.porechop:
+    #if args.medaka and args.porechop:
         
-        print('Binning the reads with porechop first, then assembling consensus using medaka')
+        #print('Binning the reads with porechop first, then assembling consensus using medaka')
         
-    if args.medaka == False and args.porechop == False:
+    if args.medaka == False and args.porechop == False and args.nanofilt == False:
         
         sys.exit('Need to specify -M to generate consensus without binning (Medaka),'
-        'or -P to bin reads on barcodes (Porechop)')
-       
-    
-   
+        ' -P to bin reads on barcodes (Porechop), or -F for filtering (Nanofilt)')
+        
     return args
 
 def loadReads(inputFiles, referenceFiles, outputDir):
@@ -143,8 +179,18 @@ def runMedaka(reads, reference, outputDir, threads, porechop = False):
     return 
 
 
-def filterReads():
-    return
+def filterReads(reads, maxLength, minLength, quality, porechop, medaka):
+    
+    subprocess.run(['NanoFilt -q %s -l %s --maxlength %s %s> filtered_output.fastq' %
+                    (quality, minLength, maxLength, reads)], shell = True)
+    
+    new_reads = 'filtered_output.fastq'
+    
+    if porechop == False and medaka == False:
+        
+        sys.exit('Done: Filtered Reads written to "filtered_output.fastq" no Porechop or Medaka called')
+    
+    return new_reads
 
     
 def processMedakaOutput(outputDir, porechop):
@@ -176,8 +222,11 @@ def runPorechop(reads, outputDir, barcodes, barcodeThreshold, threads, endSize, 
             os.makedirs(outputDir)
     detailsOut = open(os.path.join(outputDir, 'PorechopRunDetails.txt'), 'wt')
     
-    detailsOut.write('Porechop run details \nInput files: %s \nBarcodes: %s \nOutput Directory:'
+    detailsOut.write('Porechop run details \n'
+                     '_____________________________________\n'
+                     'Input files: %s \nBarcodes: %s \nOutput Directory:'
                      '%s \nBarcode Threshold: %s \nThreads: %s \nEnd Size: %s \nMedaka: %s \nInterations %s\n'
+                     '_____________________________________\n'
          % (reads, barcodes, outputDir, barcodeThreshold, str(threads), str(endSize), str(medaka), str(iterations)))
     
     detailsOut.close()
@@ -188,18 +237,19 @@ def runPorechop(reads, outputDir, barcodes, barcodeThreshold, threads, endSize, 
         --no_split --untrimmed -v 0 --end_size %s --discard_unassigned'
         
         if x == 0:  
-            subprocess.run([baseRun % (reads, outputDir_0, barcodes, str(threads),
+            subprocess.run([baseRun % (reads, outputDir + '_0', barcodes, str(threads),
                                        str(barcodeThreshold), str(endSize))], shell = True)
             
         else:
             subprocess.run([baseRun % (reads, outputDir+'_'+str(x), barcodes, str(threads),
                                        str(barcodeThreshold), str(endSize))], shell = True)
     
-    if medaka:
+#     if medaka:
+#         runMedaka(reads, reference, barcodes, threads, porechop = True)
         
-        runMedaka(reads, reference, barcodes, threads, porechop = True)
+    else:
         
-    processPorechopOutput(outputDir, iterations, barcodes)
+        processPorechopOutput(outputDir, iterations, barcodes)
     
     return
 
@@ -207,7 +257,8 @@ def processPorechopOutput(outputDir, iterations, barcodes):
     
     paths = [path for path in os.listdir('.') if path.startswith(outputDir)]
     
-    if len(paths) != int(iterations):
+    #Camille this is a cheap fix, please figure this out
+    if len(paths) < int(iterations):
         
         sys.exit('Number of directories is not the same as number of iterations, one or more'
                 'rounds of Porechop likely failed, try again with new parameters (--end_size) recommended')
@@ -219,17 +270,25 @@ def processPorechopOutput(outputDir, iterations, barcodes):
         finalOutput = outputDir + '_Final'
         
         os.mkdir(finalOutput)
+                
+        runSummary = open(finalOutput+'/runSummary.txt', 'wt')
         
-        finalFastq = open('allBinned.fastq', 'wt')
         
-        
-        for directory in paths:
+        for directory in range(len(paths)):
             
-            subprocess.run(['cat %s/*.fastq >> %s/allBinned.fastq' % (directory, finalOutput)], shell = True)
-            #subprocess.run(['rm -r %s' % directory], shell = True)
+            subprocess.run(['cat %s/PorechopRunDetails.txt >> %s/runSummary.txt' % 
+                            (paths[directory], finalOutput)], shell = True)
+            
+            if directory == 0:
+                continue
+                
+            else:
+                subprocess.run(['cat %s/*.fastq >> %s/allBinned.fastq' % (paths[directory], finalOutput)], shell = True)
+            
+            
         
-        finalFastq.close()
-        
+        runSummary.close()
+       
         runMinimap2(outputDir, barcodes)
         
     return 
@@ -239,11 +298,14 @@ def runMinimap2(outputDir, reference):
     
     finalReads = outputDir + '_Final/allBinned.fastq'
     
-    minimap2Run = 'minimap2 -ax map-ont %s %s | samtools sort -o %s'
+    minimap2Run = 'minimap2 -ax map-ont -L %s %s | samtools view -bq 1 | samtools sort -o %s'
     
-    #samtoolsRun = 'samtools sort | samtools view -q > %s/filtered_sorted_binned_reads.sam'
+    subprocess.run([minimap2Run % (reference, finalReads, outputDir+'_Final/filtered_sorted_reads.bam')], shell = True)
     
-    subprocess.run([minimap2Run % (reference, finalReads, outputDir+'_Final/sorted_reads.sam')], shell = True)
+    subprocess.run(['samtools markdup -r %s/filtered_sorted_reads.bam %s/final_processed.bam' % 
+                    (outputDir+'_Final', outputDir+'_Final')], shell = True)
+    
+    #subprocess.run([samtools view -q 1 ])
         
     return 
        
