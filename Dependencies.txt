@@ -1,0 +1,60 @@
+Dependencies:
+    
+    All require Python 3, please see software sources for more detailed requirements
+    
+    Medaka
+    
+        Prefered installation - Using a virtual environment, takes care of medaka dependencies:
+
+            conda create -n medaka -c conda-forge -c bioconda medaka
+            
+            conda activate medaka
+
+            --------------------------------------------------------------
+
+            virtualenv medaka --python=python3 --prompt "(medaka) "
+            . medaka/bin/activate
+            pip install medaka
+            
+        Source: https://github.com/nanoporetech/medaka
+        
+    Porechop
+    
+        Porechop is officially unsupported by Nanopore, but is one of the better tools if using custom barcodes. 
+        Note, as of 20200204, new branch PorechopCustom with barcoding.py and edited porechop.py
+    
+            git clone https://github.com/rrwick/Porechop.git
+            cd Porechop
+            python3 setup.py install
+            
+        Source: https://github.com/rrwick/Porechop
+            
+    NanoFilt
+    
+        Stuff
+            
+            pip install nanofilt
+            pip install nanofilt --upgrade
+           
+            --------------------------------------------------------------
+            
+            conda install -c bioconda nanofilt
+            
+        Source: https://github.com/wdecoster/nanofilt
+   
+    Samtools
+    
+    ______________________________________________________________________
+    BulkPlasmidSeq usage examples (Not updated ):
+    
+    For filtered sequences with known reference sequence:
+    
+        python bulkPlasmidSeq.py -i my_reads.fastq -r my_plasmid_genome.fa -o output_directory -t 4 -M
+  
+        python bulkPlasmidSeq.py -i path/to/reads -BC path/to/plasmids -P
+        
+        
+        
+    For unfiltered reads - Guppy filters to Q7 ~85% basecalling accuracy:
+    
+        python bulkPlasmidSeq.py -i my_reads.fastq -r my_plasmid_genome.fa -q 8 
