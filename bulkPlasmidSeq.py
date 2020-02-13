@@ -324,7 +324,7 @@ def runMinimap2(outputDir, reference):
     subprocess.run(['samtools markdup -r %s/filtered_sorted_reads.bam %s/final_processed.bam' % 
                     (outputDir+'_Final', outputDir+'_Final')], shell = True)
     
-    subprocess.run(['samtools index %s/final_processed.bam' % outputDir + '_Final'], shell = True)
+    subprocess.run(['samtools index %s/final_processed.bam' % (outputDir + '_Final')], shell = True)
     
     #subprocess.run([samtools view -q 1 ])
         
