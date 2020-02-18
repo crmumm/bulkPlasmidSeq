@@ -82,13 +82,6 @@ def main():
         else:
             sys.exit('Porechop needs input reads (-i), output directory (-o), and reference sequences (-r)')
     
-#     if args.screenshot:
-#         if args.medaka and args.porechop == False:
-#             sys.exit('This program takes screen shots after Porechop or Medaka was used to map reads.'
-#                      'Neither Porechop or Medaka was specified')
-#         else:
-#             takeScreenshots(reference, outputDir)
-    
     
 def getArgs():
     '''
@@ -253,7 +246,7 @@ def processMedakaOutput(outputDir, porechop, screenshot, igv = None):
         
 def runPorechop(reads, outputDir, barcodes, barcodeThreshold, threads, endSize, iterations, screenshot, igv):
     '''
-    As of 20200206: Relies on CM custom build of rrwick's Porechop.
+    As of 20200206: Relies on CM build of rrwick's Porechop.
     This function sets up target directories for running Porechop with input reads, the sequence that will be used for
     custom barcoding as well as other Porechop specific parameters. Outputs that were written to various directories are
     processed with processPorechopOutput.
@@ -277,63 +270,51 @@ def runPorechop(reads, outputDir, barcodes, barcodeThreshold, threads, endSize, 
         baseRun = 'porechop -i %s -b %s -BC %s -t %s --barcode_threshold %s \
         --no_split --untrimmed -v 0 --end_size %s --discard_unassigned'
         
-        if x == 0:
-            #First run is 
-            subprocess.run([baseRun % (reads, outputDir + '_0', barcodes, str(threads),
-                                       str(barcodeThreshold), str(endSize))], shell = True)
+#         if x == 0:
+#             #First run is 
+#             subprocess.run([baseRun % (reads, outputDir + '_0', barcodes, str(threads),
+#                                        str(barcodeThreshold), str(endSize))], shell = True)
             
-        else:
-            subprocess.run([baseRun % (reads, outputDir+'_'+str(x),
+#         else:
+        subprocess.run([baseRun % (reads, outputDir+'_'+str(x),
                                        barcodes, str(threads), str(barcodeThreshold), str(endSize))], shell = True)
-    #Did I need that else?    
+            
     processPorechopOutput(outputDir, iterations, barcodes, screenshot, igv)
     
     return
 
 def processPorechopOutput(outputDir, iterations, barcodes, screenshot, igv):
     
+    #This causes problems if you name multiple output directories similar names. I recommend using the date
+    #All the run info will be included in an output file, so a very descriptive name is not necessary
     paths = [path for path in os.listdir('.') if path.startswith(outputDir)]
-    
-    #Camille this is a cheap fix, please figure this out
-    if len(paths) < int(iterations):
         
-        sys.exit('Number of directories is not the same as number of iterations, one or more'
-                'rounds of Porechop likely failed, try again with new parameters (--end_size) recommended')
-    
-    else:
+    finalOutput = outputDir + '_Final'
         
-        #barcodes = [BC for BC in os.listdir(paths[0]) if BC.startswith('BC')]
-        
-        finalOutput = outputDir + '_Final'
-        
-        os.mkdir(finalOutput)
+    os.mkdir(finalOutput)
                 
-        runSummary = open(finalOutput+'/runSummary.txt', 'wt')
+    runSummary = open(finalOutput+'/runSummary.txt', 'wt')
         
         
-        for directory in range(len(paths)):
+    for directory in range(len(paths)):
             
-            subprocess.run(['cat %s/PorechopRunDetails.txt >> %s/runSummary.txt' % 
+        subprocess.run(['cat %s/PorechopRunDetails.txt >> %s/runSummary.txt' % 
                             (paths[directory], finalOutput)], shell = True)
             
-            if directory == 0:
-                continue
+        if directory == 0:
+            continue
                 
-            else:
-                subprocess.run(['cat %s/*.fastq >> %s/allBinned.fastq' % (paths[directory], finalOutput)], shell = True)
+        else:
+            subprocess.run(['cat %s/*.fastq >> %s/allBinned.fastq' % (paths[directory], finalOutput)], shell = True)
             
-            
-        
-        runSummary.close()
+    runSummary.close()
        
-        runMinimap2(outputDir, barcodes, screenshot, igv)
+    runMinimap2(outputDir, barcodes, screenshot, igv)
         
     return 
 
         
 def runMinimap2(outputDir, reference, screenshot, igv):
-    
-    print('Pretending to run Minimap')
     
     finalReads = outputDir + '_Final/allBinned.fastq'
     
@@ -357,42 +338,30 @@ def runMinimap2(outputDir, reference, screenshot, igv):
 
 def takeScreenshots(reference, outputDir, screenshot, igv):
     
-    subprocess.run(['mkdir %s/screenshots'% outputDir], shell = True)
-    plasmidList = {}
-    with open(reference, 'rt') as f:
-        name=''
-        seq=''
+    subprocess.run(['mkdir %s_Final/screenshots'% outputDir], shell = True)
+    plasmidList = []
+    with open(reference, 'rt') as f:#Determine what screenshots to take based on reference
         for line in f:
-            if line.startswith('>') and seq != '': #not first seq
-                name = name[1:] #removes the carrot
-                plasmidList[name] = len(seq)
-                name=line.strip()
-                seq=''
-            elif line.startswith('>'):  #first seq
-                name=line.strip()
-            else:
-                seq += line.strip()
-        if name and seq: #last seq
-            name = name[1:]
-            plasmidList[name] = len(seq)
-            
+            if line.startswith('>'):
+                plasmidList.append(line.strip('> \n'))
+                
     stringForIGV = ''
     for plasmid in plasmidList:
-        
-        stringForIGV += 'goto %s\nsnapshot %s.png\n' % (plasmid, plasmid)
+        #####################Testing thing here
+        stringForIGV += 'goto %s\nsnapshot\nsetSleepInterval 10\n' % (plasmid)
+        #stringForIGV += 'goto %s\nsnapshot %s.png\n' % (plasmid, plasmid)
     
-    igvBatch = open('igv_screenshot.bat', 'wt')
+    igvBatch = open('%s_Final/igv_screenshot.bat'%outputDir, 'wt')
     
-    template = 'new \nsnapshotDirectory %s\ngenome %s \nload %s \nmaxPanelHeight 400' \
-    '\n%sexit'% (outputDir + '/screenshots', reference, outputDir + '/final_processed.bam', stringForIGV)
+    #IGV is very VERY picky about formatting here
+    template = 'new\nsnapshotDirectory %s\ngenome %s\nload %s\nmaxPanelHeight 400' \
+    '\n%sexit'% (outputDir + '_Final/screenshots', reference, outputDir + '_Final/final_processed.bam', stringForIGV)
         
     igvBatch.write(template)
         
     igvBatch.close()
     
-    subprocess.run(['%s -b %s' % (igv, 'igv_screenshot.bat')], shell = True)
-    
-    
+    subprocess.run(['%s -b %s' % (igv, outputDir + '_Final/igv_screenshot.bat')], shell = True)
     
        
 if __name__ == "__main__":
