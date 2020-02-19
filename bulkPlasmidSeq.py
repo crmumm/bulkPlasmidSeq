@@ -11,8 +11,6 @@ import shutil
 import subprocess
 import time
 
-from collections import defaultdict
-
 def main():
     '''
     See dependencies in accompanying text file.
@@ -81,7 +79,7 @@ def main():
         
         else:
             sys.exit('Porechop needs input reads (-i), output directory (-o), and reference sequences (-r)')
-    
+            
     
 def getArgs():
     '''
@@ -109,7 +107,7 @@ def getArgs():
     
     porechopArgs = ap.add_argument_group('Porechop Options')
     porechopArgs.add_argument('--barcode_threshold', required = False, default = 75)
-    porechopArgs.add_argument('--end_size', required = False, default = 1000)
+    porechopArgs.add_argument('--end_size', required = False, default = 250)
     porechopArgs.add_argument('-BC', '--barcodes', required = False, help = 'Make barcodes')
     porechopArgs.add_argument('-N', '--porechop_iterations', required = False, default = 1,
                               help = 'Number of rounds of Porechop binning')
@@ -122,7 +120,7 @@ def getArgs():
     igv = ap.add_argument_group('IGV arguments for screenshotting')
     igv.add_argument('--screenshot', required = False, action = 'store_true',
                      help = 'Take screenshots of IGV for each plasmid')
-    igv.add_argument('--igv', required = False, default = 'igv_hidpi.sh', help = 'Path to igv.sh or igv_hidpi.sh')
+    igv.add_argument('--igv', required = False, default = None, help = 'Path to igv.sh')
     
 
     args = ap.parse_args()
@@ -131,6 +129,9 @@ def getArgs():
         
         sys.exit('Need to specify -M to generate consensus without binning (Medaka),'
         ' -P to bin reads on barcodes (Porechop), or -F for filtering (Nanofilt)')
+    
+    if args.screenshot and args.igv is None:
+        sys.exit('Please specify a path to igv.sh for taking screenshots')
         
     return args
 
@@ -249,6 +250,7 @@ def runPorechop(reads, outputDir, barcodes, barcodeThreshold, threads, endSize, 
     
     if not os.path.isdir(outputDir):
             os.makedirs(outputDir)
+            
     detailsOut = open(os.path.join(outputDir, 'PorechopRunDetails.txt'), 'wt')
     
     detailsOut.write('Porechop run details \n'
@@ -265,7 +267,7 @@ def runPorechop(reads, outputDir, barcodes, barcodeThreshold, threads, endSize, 
         baseRun = 'porechop -i %s -b %s -BC %s -t %s --barcode_threshold %s \
         --no_split --untrimmed -v 0 --end_size %s --discard_unassigned'
 
-        subprocess.run([baseRun % (reads, outputDir+'_'+str(x),
+        subprocess.run([baseRun % (reads, outputDir + '/' + 'porechop_'+str(x),
                                        barcodes, str(threads), str(barcodeThreshold), str(endSize))], shell = True)
             
     processPorechopOutput(outputDir, iterations, barcodes, screenshot, igv)
@@ -278,26 +280,24 @@ def processPorechopOutput(outputDir, iterations, barcodes, screenshot, igv):
     and cats the runs together for minimap2.
     
     Notes:
-    Would like to implement a portion that zips all indiviual bins. 
+    Would like to implement a portion that zips all indiviual bins. Done
     '''
     
     #This causes problems if you name multiple output directories similar names. I recommend using the date
     #All the run info will be included in an output file, so a very descriptive name is not necessary
-    paths = [path for path in os.listdir('.') if path.startswith(outputDir)]
+    paths = [path for path in os.listdir(outputDir) if path.startswith('porechop_')]
                 
-    runSummary = open(outputDir+'/runSummary.txt', 'wt')
+    runSummary = open(outputDir+'/porechop_run_details.txt', 'a+')
         
         
     for directory in range(len(paths)):
         
-        subprocess.run(['cat %s/PorechopRunDetails.txt >> %s/runSummary.txt' % 
-                            (paths[directory], outputDir)], shell = True)
-            
-        if directory == 0:
-            continue
-                
-        else:
-            subprocess.run(['cat %s/*.fastq >> %s/allBinned.fastq' % (paths[directory], outputDir)], shell = True)
+        subprocess.run(['cat %s/PorechopRunDetails.txt >> %s/porechop_run_details.txt' % 
+                            (outputDir + '/' + paths[directory], outputDir)], shell = True)
+        subprocess.run(['cat %s/*.fastq >> %s/all_binned.fastq' %
+                            (outputDir + '/' + paths[directory], outputDir)], shell = True)
+        
+        subprocess.run(['gzip %s/*.fastq' % (outputDir + '/' + paths[directory])], shell = True)
             
     runSummary.close()
        
