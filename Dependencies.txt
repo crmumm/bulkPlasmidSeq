@@ -1,10 +1,11 @@
 Dependencies:
     
-    All require Python 3, please see software sources for more detailed requirements
+    All require Python 3, please see software sources for more detailed requirements. I recommend installing
+    all of these inside the Medaka conda environment. Samtools and minimap2 already installed with Medaka environment.
     
     Medaka
     
-        Prefered installation - Using a virtual environment, takes care of medaka dependencies:
+        Prefered installation - Using conda environment, takes care of medaka dependencies:
 
             conda create -n medaka -c conda-forge -c bioconda medaka
             
@@ -21,7 +22,8 @@ Dependencies:
     Porechop
     
         Porechop is officially unsupported by Nanopore, but is one of the better tools if using custom barcodes. 
-        Note, as of 20200204, new branch PorechopCustom with barcoding.py and edited porechop.py
+        For custom barcoding, using sequence features other than the ligated ONT barcodes, please use crmumm's 
+        fork of Porechop. This integrates barcoding.py into Porechop. 
     
             git clone https://github.com/rrwick/Porechop.git
             cd Porechop
@@ -31,7 +33,8 @@ Dependencies:
             
     NanoFilt
     
-        Stuff
+        One of several available long read filtering softwares, NanoFilt has the advantage of specifying
+        the maximimum read length which is good for filtering out extra long reads.
             
             pip install nanofilt
             pip install nanofilt --upgrade
@@ -44,16 +47,23 @@ Dependencies:
    
     Samtools
     
+    Minimap2
+    
+    
     ______________________________________________________________________
-    BulkPlasmidSeq usage examples (Not updated ):
+    BulkPlasmidSeq usage examples:
     
-    For filtered sequences with known reference sequence:
-    
-        python bulkPlasmidSeq.py -i my_reads.fastq -r my_plasmid_genome.fa -o output_directory -t 4 -M
+    For binning sequences based on reference - Porechop:
   
-        python bulkPlasmidSeq.py -i path/to/reads -BC path/to/plasmids -P
+        python bulkPlasmidSeq.py -i path/to/reads -BC path/to/plasmids -o output_directory -P
         
+        python bulkPlasmidSeq.py -i path/to/reads -BC path/to/plasmids -o output_directory -P --screenshot \
+            --igv path/to/igv.sh
+            
+    
+    For generating concensus sequences - Medaka:
         
+        python bulkPlasmidSeq.py -i my_reads.fastq -r my_plasmid_genome.fa -o output_directory -t 4 -M
         
     For unfiltered reads - Guppy filters to Q7 ~85% basecalling accuracy:
     
