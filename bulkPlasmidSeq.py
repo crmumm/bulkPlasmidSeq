@@ -323,7 +323,7 @@ def runMinimap2(outputDir, reference, screenshot, igv):
     minimap2Run = 'minimap2 -ax map-ont -L %s %s | samtools view -bq 1 | samtools sort -o %s'
     
     subprocess.run([minimap2Run %
-                    (reference, outputDir+'/allBinned.fastq', outputDir+'/filtered_sorted_reads.bam')], shell = True)
+                    (reference, outputDir+'/all_binned.fastq', outputDir+'/filtered_sorted_reads.bam')], shell = True)
     
     subprocess.run(['samtools markdup -r %s/filtered_sorted_reads.bam %s/final_processed.bam' % 
                     (outputDir, outputDir)], shell = True)
