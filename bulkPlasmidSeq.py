@@ -236,9 +236,9 @@ def processMedakaOutput(outputDir, reference, screenshot, igv = None):
                 out = open('%s/%s.fasta' % (outputDir, header[1:-1]), 'w')
                 out.write('%s \n%s' % (header, seq))
     
-    subprocess.run(['samtools view -bq 1 %s/calls_to_draft.bam > %s/unique_calls_to_draft.bam' %
+    subprocess.run(['samtools view -bq 1 %s/calls_to_draft.bam > %s/final_processed.bam' %
                     (outputDir, outputDir)], shell = True)
-    subprocess.run(['samtools index %s/unique_calls_to_draft.bam' % outputDir], shell = True)
+    subprocess.run(['samtools index %s/final_processed.bam' % outputDir], shell = True)
     
                 
     #Run take screenshots based on final_processed.bam    
@@ -248,7 +248,7 @@ def processMedakaOutput(outputDir, reference, screenshot, igv = None):
         
 def runPorechop(reads, outputDir, barcodes, barcodeThreshold, threads, endSize, iterations, screenshot, igv):
     '''
-    As of 20200218: Relies on CM build of rrwick's Porechop.
+    As of 20200218: Relies on CM fork of rrwick's Porechop.
     This function sets up target directories for running Porechop with input reads, the sequence that will be used for
     custom barcoding as well as other Porechop specific parameters. Outputs that were written to various directories are
     processed with processPorechopOutput.
@@ -257,7 +257,7 @@ def runPorechop(reads, outputDir, barcodes, barcodeThreshold, threads, endSize, 
     if not os.path.isdir(outputDir):
             os.makedirs(outputDir)
             
-    detailsOut = open(os.path.join(outputDir, 'PorechopRunDetails.txt'), 'wt')
+    detailsOut = open(os.path.join(outputDir, 'run_details.txt'), 'wt')
     
     detailsOut.write('Porechop run details \n'
                      '_____________________________________\n'
@@ -283,26 +283,25 @@ def runPorechop(reads, outputDir, barcodes, barcodeThreshold, threads, endSize, 
 def processPorechopOutput(outputDir, iterations, barcodes, screenshot, igv):
     '''
     Looks in all the directories make by Porechop and concatinates the run information into runSummary
-    and cats the runs together for minimap2.
-    
-    Notes:
-    Would like to implement a portion that zips all indiviual bins. Done
+    and cats the runs together for minimap2. Zips the fastq files that were assigned to each bin.
     '''
     
     #This causes problems if you name multiple output directories similar names. I recommend using the date
     #All the run info will be included in an output file, so a very descriptive name is not necessary
     paths = [path for path in os.listdir(outputDir) if path.startswith('porechop_')]
                 
-    runSummary = open(outputDir+'/porechop_run_details.txt', 'a+')
-        
+    runSummary = open(outputDir+'/run_details.txt', 'a+')
+    
+    print(str(paths))
         
     for directory in range(len(paths)):
         
-        subprocess.run(['cat %s/PorechopRunDetails.txt >> %s/porechop_run_details.txt' % 
+        subprocess.run(['cat %s/run_details.txt >> %s/run_details.txt' % 
                             (outputDir + '/' + paths[directory], outputDir)], shell = True)
+
         subprocess.run(['cat %s/*.fastq >> %s/all_binned.fastq' %
                             (outputDir + '/' + paths[directory], outputDir)], shell = True)
-        
+
         subprocess.run(['gzip %s/*.fastq' % (outputDir + '/' + paths[directory])], shell = True)
             
     runSummary.close()
@@ -336,7 +335,6 @@ def runMinimap2(outputDir, reference, screenshot, igv):
     
     subprocess.run(['samtools index %s/final_processed.bam' % (outputDir)], shell = True)
     
-    #Run take screenshots based on final_processed.bam
     if screenshot:
         
         takeScreenshots(reference, outputDir, igv)
