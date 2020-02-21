@@ -1,4 +1,3 @@
-import argparse
 import os
 import sys
 import shutil
@@ -8,18 +7,19 @@ import bulkPlasmidSeq as main
 
 def run(reads, reference, outputDir, args):
     '''
-    Running Medaka, check that Porechop is false. Check the necessary inputs. Checks for use of -r vs -BC. 
-    These two args take the same thing! A file or directory full of plasmids, the distiction is used for user clarity.
+    Running Medaka, check that Porechop is false. Takes as input fastq reads or directory to reads,
+    a fasta file with all the plasmid or directory pointing to the plasmid files. 
     '''
         
     if None not in (reads, reference, outputDir):
-        runMedaka(reads, reference, outputDir, args.threads, args.screenshot, args.igv)
+        try:
+            runMedaka(reads, reference, outputDir, args.threads, args.screenshot, args.igv)
             
-    elif args.barcodes is not None:
-        print('Medaka does not use barcodes, running with the reference sequence provided, --barcodes will be ignored')
+        except IOError:
+            sys.exit('IO error: check that you have activated medaka conda environment/ medaka_consensus available')
         
     else:
-        sys.exit('Porechop needs input reads (-i), output directory (-o), and reference sequences (-r)')
+        sys.exit('Medaka needs input reads (-i), output directory (-o), and reference sequences (-r)')
 
 
 

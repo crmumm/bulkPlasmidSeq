@@ -1,4 +1,3 @@
-import argparse
 import os
 import sys
 import shutil
@@ -14,8 +13,12 @@ def run(reads, reference, outputDir, args):
     
     #I am actively choosing to rewrite how Porechop handles arguments -BC/-reference
     if None not in (reference, outputDir):
-        runPorechop(reads, outputDir, reference, args.barcode_threshold,
+        try:
+            runPorechop(reads, outputDir, reference, args.barcode_threshold,
                     args.threads, args.end_size, args.porechop_iterations, args.screenshot, args.igv)
+    
+        except IOError:
+            sys.exit('IO error: check that you have activated medaka conda environment/ medaka_consensus available')
             
     else:
         sys.exit('Porechop needs input reads (-i), output directory (-o), and barcodes (-BC)')
@@ -23,7 +26,7 @@ def run(reads, reference, outputDir, args):
 
 def runPorechop(reads, outputDir, barcodes, barcodeThreshold, threads, endSize, iterations, screenshot, igv):
     '''
-    As of 20200218: Relies on CM fork of rrwick's Porechop.
+    Relies on crmumm fork of rrwick's Porechop.
     This function sets up target directories for running Porechop with input reads, the sequence that will be used for
     custom barcoding as well as other Porechop specific parameters. Outputs that were written to various directories are
     processed with processPorechopOutput.

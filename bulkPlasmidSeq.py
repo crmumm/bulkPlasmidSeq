@@ -19,6 +19,10 @@ def pick_submodule(args):
     
     else:
         sys.exit('Missing one of the following arguments, --input(-i), --reference(-r), --output_dir(-o)')
+        
+    if args.filter == True:
+        
+        reads = filterReads(reads, args.max_length, args.min_length, args.min_quality)
     
     if args.submod == 'Porechop':
         import porechop_wrap as submod
@@ -58,13 +62,6 @@ def getArgs():
     '''
     ap = argparse.ArgumentParser()
     subparsers = ap.add_subparsers(title='[sub-commands]', dest='submod')
-    
-    #NanoFilt args
-    nanofilt = ap.add_argument_group('Nanofilt arguments')
-    nanofilt.add_argument('--max_length', required = False, default = 100000, help = 'Filtering reads by maximum length')
-    nanofilt.add_argument('--min_length', required = False, default = 0,  help = 'Filtering reads by minimum length')
-    nanofilt.add_argument('-q', '--min_quality', required = False, default = 7, help = 'Filter reads by quality score > N')
-    
         
     ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
     ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
@@ -83,6 +80,8 @@ def getArgs():
                           help = 'output directory')
     generalArgs.add_argument('-t', '--threads', required = False, default = 2,
                           help = 'number of threads, default 2')
+    generalArgs.add_argument('--filter', required = False, action='store_true',
+                       default = False, help = 'Filter reads before analysis')
     
     porechop = porechopArgs.add_argument_group('Porechop Specific arguments')
     porechop.add_argument('--barcode_threshold', required = False, default = 75)
@@ -95,6 +94,12 @@ def getArgs():
     igvPorechop.add_argument('--screenshot', required = False, action = 'store_true',
                      help = 'Take screenshots of IGV for each plasmid')
     igvPorechop.add_argument('--igv', required = False, default = None, help = 'Path to igv.sh')
+    
+    #NanoFilt args
+    nanofilt = porechopArgs.add_argument_group('Nanofilt arguments')
+    nanofilt.add_argument('--max_length', required = False, default = 100000, help = 'Filtering reads by maximum length')
+    nanofilt.add_argument('--min_length', required = False, default = 0,  help = 'Filtering reads by minimum length')
+    nanofilt.add_argument('-q', '--min_quality', required = False, default = 7, help = 'Filter reads by quality score > N')
     
     porechopArgs.set_defaults(func=pick_submodule)
             
@@ -116,12 +121,21 @@ def getArgs():
     
     generalArgsMedaka.add_argument('--info', required = False, help = 
                            'Medaka takes no additional args, thanks for using this submodule')
+    generalArgsMedaka.add_argument('--filter', required = False, action='store_true',
+                       default = False, help = 'Filter reads before analysis')
     
     #IGV screenshot args Porchop
     igvMedaka = medakaArgs.add_argument_group('IGV arguments for screenshotting')
     igvMedaka.add_argument('--screenshot', required = False, action = 'store_true',
                      help = 'Take screenshots of IGV for each plasmid')
     igvMedaka.add_argument('--igv', required = False, default = None, help = 'Path to igv.sh')
+    
+    
+    #NanoFilt args
+    nanofilt = medakaArgs.add_argument_group('Nanofilt arguments')
+    nanofilt.add_argument('--max_length', required = False, default = 100000, help = 'Filtering reads by maximum length')
+    nanofilt.add_argument('--min_length', required = False, default = 0,  help = 'Filtering reads by minimum length')
+    nanofilt.add_argument('-q', '--min_quality', required = False, default = 7, help = 'Filter reads by quality score > N')
     
     medakaArgs.set_defaults(func=pick_submodule)
     
@@ -134,6 +148,7 @@ def getArgs():
         sys.exit('Please specify a path to igv.sh for taking screenshots')
         
     return args
+
 
 def loadReads(inputFiles, referenceFiles, outputDir):
     print(inputFiles, referenceFiles, outputDir)
@@ -188,7 +203,7 @@ def loadReads(inputFiles, referenceFiles, outputDir):
     return reads, reference, outputDir
 
 
-def filterReads(reads, maxLength, minLength, quality, porechop, medaka):
+def filterReads(reads, maxLength, minLength, quality):
     '''
     Filters reads using NanoFilt. More options are available if you use NanoFilt itself please see
     https://github.com/wdecoster/nanofilt for more information. This program only allows for read length and q score 
@@ -199,10 +214,6 @@ def filterReads(reads, maxLength, minLength, quality, porechop, medaka):
                     (quality, minLength, maxLength, reads)], shell = True)
     
     new_reads = 'filtered_output.fastq'
-    
-    if porechop == False and medaka == False:
-        
-        sys.exit('Done: Filtered Reads written to "filtered_output.fastq" no Porechop or Medaka called')
     
     return new_reads
 
