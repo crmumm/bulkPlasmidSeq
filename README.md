@@ -55,15 +55,15 @@ Dependencies:
     
     For binning sequences based on reference - Porechop:
   
-        python bulkPlasmidSeq.py -i path/to/reads -BC path/to/plasmids -o output_directory -P
+        python bulkPlasmidSeq.py Porechop -i path/to/reads -r path/to/plasmids -o output_directory
         
-        python bulkPlasmidSeq.py -i path/to/reads -BC path/to/plasmids -o output_directory -P --screenshot \
+        python bulkPlasmidSeq.py Porechop -i path/to/reads -r path/to/plasmids -o output_directory --screenshot \
             --igv path/to/igv.sh
             
     
     For generating concensus sequences - Medaka:
         
-        python bulkPlasmidSeq.py -i my_reads.fastq -r my_plasmid_genome.fa -o output_directory -t 4 -M
+        python bulkPlasmidSeq.py Medaka -i my_reads.fastq -r my_plasmid_genome.fa -o output_directory -t 4
         
     For unfiltered reads - Guppy filters to Q7 ~85% basecalling accuracy:
     
