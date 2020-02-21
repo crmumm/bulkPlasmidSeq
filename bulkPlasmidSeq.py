@@ -9,76 +9,45 @@ import os
 import sys
 import shutil
 import subprocess
-import time
+
+
+def pick_submodule(args):
+    
+    if None not in (args.input_reads, args.reference, args.output_dir):
+    
+        reads, reference, outputDir = loadReads(args.input_reads, args.reference, args.output_dir)
+    
+    else:
+        sys.exit('Missing one of the following arguments, --input(-i), --reference(-r), --output_dir(-o)')
+    
+    if args.submod == 'Porechop':
+        import porechop_wrap as submod
+            
+    elif args.submod == 'Medaka':
+            
+        import medaka_wrap as submod
+    
+    submod.run(reads, reference, outputDir, args)
 
 def main():
     '''
     See dependencies in accompanying text file.
     
-    BulkPlasmidSeq usage examples (Not updated with Porechop implementation):
+    BulkPlasmidSeq usage examples:
     
     For alignment, polishing, and creating consensus without binning (Medaka):
     
-        python bulkPlasmidSeq.py -i 'path/to/reads' -r 'path/to/plasmids' -o outputDirectory  -M
+        python bulkPlasmidSeq.py Medaka -i 'path/to/reads' -r 'path/to/plasmids' -o outputDirectory
     
     For binning and alignment (Porechop):
     
-        python bulkPlasmidSeq.py -i 'path/to/reads' -o outputDirectory -BC 'path/to/plasmids' -P
+        python bulkPlasmidSeq.py Porechop -i 'path/to/reads' -o outputDirectory -BC 'path/to/plasmids'
         
-        python bulkPlasmidSeq.py -i 'path/to/reads' -o outputDirectory -BC 'path/to/plasmids' -P --end_size 1000 -N 3        
+        python bulkPlasmidSeq.py Porechop -i 'path/to/reads' -o outputDirectory -BC 'path/to/plasmids' --end_size 1000 -N 3        
     '''
+    #20200220 Notes, I'm trying to make the Porechop and Medaka functionalities more separate 
+    #Modeling this after arq5x's poretools submodule calling structure
     args = getArgs()
-    
-    if None not in (args.input_reads, args.output_dir):
-    
-        reads, reference, outputDir = loadReads(args.input_reads, args.reference, args.output_dir)
-        
-    else:
-        sys.exit('Missing one of the following arguments, --input(-i), --reference(-r), --output_dir(-o)')
-    
-    if args.nanofilt:
-        '''
-        Runs Nanofilt with specified filters, updates reads to use for downstream analysis
-        If none of the defaults are changed, tell the user and tell them to change min_length to something different
-        To ignore this check
-        '''
-        if args.max_length == 100000 and args.min_length == 0 and args.min_quality == 7:
-            sys.exit('No arguments given for nanofilt, will not filter out anything from your reads unless'
-                     'you are using failed reads from Guppy. If using failed reads use --min_length 1')
-            
-        reads = filterReads(reads, args.max_length, args.min_length, args.min_quality, args.porechop, args.medaka)
-    
-    if args.porechop:
-        #Check the inputs
-        '''
-        Checks that all the necessary inputs are provided. Note that -BC is used for building custom barcodes
-        and also later as a reference for minimap. This program checks that -r isn't used even though it would do the
-        exact same thing.
-        '''
-        if None not in (outputDir, args.barcodes):
-            runPorechop(reads, outputDir, args.barcodes, args.barcode_threshold,
-                        args.threads, args.end_size, args.porechop_iterations, args.screenshot, args.igv)
-            
-        elif reference is not None:
-            sys.exit('Porechop has no option "reference". Please use -BC which will be used for barcoding and reference')
-            
-        else:
-            sys.exit('Porechop needs input reads (-i), output directory (-o), and barcodes (-BC)')
-    
-    if args.medaka:
-        '''
-        Running Medaka, check that Porechop is false. Check the necessary inputs. Checks for use of -r vs -BC. 
-        These two args take the same thing! A file or directory full of plasmids, the distiction is used for user clarity.
-        '''
-        
-        if None not in (reads, reference, outputDir):
-            runMedaka(reads, reference, outputDir, args.threads, args.screenshot, args.igv)
-            
-        elif args.barcodes is not None:
-            sys.exit('If you are looking for consensus building without binning (Medaka) use -r for reference, not -BC')
-        
-        else:
-            sys.exit('Porechop needs input reads (-i), output directory (-o), and reference sequences (-r)')
             
     
 def getArgs():
@@ -88,89 +57,127 @@ def getArgs():
     
     '''
     ap = argparse.ArgumentParser()
+    subparsers = ap.add_subparsers(title='[sub-commands]', dest='submod')
     
-    mainArgs = ap.add_argument_group('Main options')
-    mainArgs.add_argument('-i', '--input_reads', required=True,
-                          help= 'input reads (directory to reads or .fastq)')
-    mainArgs.add_argument('-r', '--reference', required=False,
-                          help = 'plasmid sequences (directory or .fa)')
-    mainArgs.add_argument('-o', '--output_dir', required = False,
-                          help = 'output directory')
-    mainArgs.add_argument('-t', '--threads', required = False, default = 2,
-                          help = 'number of threads, default 2')
-    mainArgs.add_argument('-M', '--medaka', action = 'store_true', required = False,
-                          help = 'Run medaka')
-    mainArgs.add_argument('-P', '--porechop', action = 'store_true', required = False,
-                          help = 'Bin reads using porechop')
-    mainArgs.add_argument('-F', '--nanofilt', action = 'store_true', required = False, 
-                         help = 'Filter reads with NanoFilt')
-    
-    porechopArgs = ap.add_argument_group('Porechop Options')
-    porechopArgs.add_argument('--barcode_threshold', required = False, default = 75)
-    porechopArgs.add_argument('--end_size', required = False, default = 250)
-    porechopArgs.add_argument('-BC', '--barcodes', required = False, help = 'Make barcodes')
-    porechopArgs.add_argument('-N', '--porechop_iterations', required = False, default = 1,
-                              help = 'Number of rounds of Porechop binning')
-    
+    #NanoFilt args
     nanofilt = ap.add_argument_group('Nanofilt arguments')
     nanofilt.add_argument('--max_length', required = False, default = 100000, help = 'Filtering reads by maximum length')
     nanofilt.add_argument('--min_length', required = False, default = 0,  help = 'Filtering reads by minimum length')
     nanofilt.add_argument('-q', '--min_quality', required = False, default = 7, help = 'Filter reads by quality score > N')
     
-    igv = ap.add_argument_group('IGV arguments for screenshotting')
-    igv.add_argument('--screenshot', required = False, action = 'store_true',
-                     help = 'Take screenshots of IGV for each plasmid')
-    igv.add_argument('--igv', required = False, default = None, help = 'Path to igv.sh')
+        
+    ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
+    ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
+    ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
+
     
+    #Porechop Args
+    porechopArgs = subparsers.add_parser('Porechop')
+    
+    generalArgs = porechopArgs.add_argument_group('General Arguments')
+    generalArgs.add_argument('-i', '--input_reads', required = True,
+                          help= 'input reads (directory to reads or .fastq)')
+    generalArgs.add_argument('-r', '--reference', required = True,
+                          help = 'plasmid sequences (directory or .fa)')
+    generalArgs.add_argument('-o', '--output_dir', required = True,
+                          help = 'output directory')
+    generalArgs.add_argument('-t', '--threads', required = False, default = 2,
+                          help = 'number of threads, default 2')
+    
+    porechop = porechopArgs.add_argument_group('Porechop Specific arguments')
+    porechop.add_argument('--barcode_threshold', required = False, default = 75)
+    porechop.add_argument('--end_size', required = False, default = 250)
+    porechop.add_argument('-rounds', '--porechop_iterations', required = False, default = 1,
+                              help = 'Number of rounds of Porechop binning')
+    
+    #IGV screenshot args Porchop
+    igvPorechop = porechopArgs.add_argument_group('IGV arguments for screenshotting')
+    igvPorechop.add_argument('--screenshot', required = False, action = 'store_true',
+                     help = 'Take screenshots of IGV for each plasmid')
+    igvPorechop.add_argument('--igv', required = False, default = None, help = 'Path to igv.sh')
+    
+    porechopArgs.set_defaults(func=pick_submodule)
+            
+    ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
+    ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
+    ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
+    
+    #Medaka takes no additional args but I'd like to separate them
+    medakaArgs = subparsers.add_parser('Medaka')
+    generalArgsMedaka = medakaArgs.add_argument_group('General Arguments')
+    generalArgsMedaka.add_argument('-i', '--input_reads', required=False,
+                          help= 'input reads (directory to reads or .fastq)')
+    generalArgsMedaka.add_argument('-r', '--reference', required=False,
+                          help = 'plasmid sequences (directory or .fa)')
+    generalArgsMedaka.add_argument('-o', '--output_dir', required =False,
+                          help = 'output directory')
+    generalArgsMedaka.add_argument('-t', '--threads', required = False, default = 2,
+                          help = 'number of threads, default 2')
+    
+    generalArgsMedaka.add_argument('--info', required = False, help = 
+                           'Medaka takes no additional args, thanks for using this submodule')
+    
+    #IGV screenshot args Porchop
+    igvMedaka = medakaArgs.add_argument_group('IGV arguments for screenshotting')
+    igvMedaka.add_argument('--screenshot', required = False, action = 'store_true',
+                     help = 'Take screenshots of IGV for each plasmid')
+    igvMedaka.add_argument('--igv', required = False, default = None, help = 'Path to igv.sh')
+    
+    medakaArgs.set_defaults(func=pick_submodule)
+    
+    ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
 
     args = ap.parse_args()
-        
-    if args.medaka == False and args.porechop == False and args.nanofilt == False:
-        
-        sys.exit('Need to specify -M to generate consensus without binning (Medaka),'
-        ' -P to bin reads on barcodes (Porechop), or -F for filtering (Nanofilt)')
-    
-    if args.screenshot and args.igv is None:
+    args.func(args)
+
+    if args.screenshot is True and args.igv is None:
         sys.exit('Please specify a path to igv.sh for taking screenshots')
         
     return args
 
 def loadReads(inputFiles, referenceFiles, outputDir):
+    print(inputFiles, referenceFiles, outputDir)
     '''
     This function checks to make the input, reference, and outputDir. If input or reference arguments are
     directories, this function concatenates the .fasta or fastq files to make the input reads easier to work with
     and the plasmids into a 'Plasmid Genome.' Checks that outputDir is not a file.
     '''
-    if os.path.isdir(inputFiles):
+    if os.path.exists(inputFiles) == False:
+        sys.exit('Input reads not found')
+        
+    elif os.path.isdir(inputFiles):
         
         print('Directory was given for input reads, concatenating these to output_reads.fastq')
         
         subprocess.run(['cat %s/*.fastq > input_reads.fastq' % inputFiles], shell = True)
         reads = 'input_reads.fastq'
                                           
-    if os.path.isfile(inputFiles):
+    elif os.path.isfile(inputFiles):
         #Checks if fastq format
         if str(inputFiles).lower().endswith('.fastq'):
             reads = inputFiles
         else:
             sys.exit('Error: Reads should be in .fastq format ')
     
-    if referenceFiles is not None:
-        if os.path.isdir(referenceFiles):
+    if os.path.exists(referenceFiles) == False:
+        sys.exit('Reference not found')
+    
 
-            print('Directory was given for plasmid reference, concatenating these to output_ref.fasta')
+    elif os.path.isdir(referenceFiles):
 
-            subprocess.run(['cat %s/*.fa* > plasmid_genome_ref.fasta' % referenceFiles], shell = True)
-            reference = 'plasmid_genome_ref.fasta'
+        print('Directory was given for plasmid reference, concatenating these to output_ref.fasta')
+
+        subprocess.run(['cat %s/*.fa* > plasmid_genome_ref.fasta' % referenceFiles], shell = True)
+        reference = 'plasmid_genome_ref.fasta'
 
 
-        if os.path.isfile(referenceFiles):
-            #Checks if reference is already assembled in to plasmid genome
-            if str(referenceFiles).lower().endswith('.fa') or str(referenceFiles).lower().endswith('.fasta'):
-                reference = referenceFiles
-            else:
-                sys.exit('Error: Reference sequence should be in .fasta or .fa format')
-                
+    elif os.path.isfile(referenceFiles):
+        #Checks if reference is already assembled in to plasmid genome
+        if str(referenceFiles).lower().endswith('.fa') or str(referenceFiles).lower().endswith('.fasta'):
+            reference = referenceFiles
+        else:
+            sys.exit('Error: Reference sequence should be in .fasta or .fa format')
+    
     if os.path.isfile(outputDir):
         sys.exit('It looks like your output directory exists exists as a file. Please remove this file or change where' 
                  'you want the output to be written to')
@@ -179,26 +186,6 @@ def loadReads(inputFiles, referenceFiles, outputDir):
         reference = referenceFiles
             
     return reads, reference, outputDir
-
-def runMedaka(reads, reference, outputDir, threads, screenshot, igv):
-    '''
-    Takes the input reads, reference, and output directory (after being processed through loadReads) and runs Medaka.
-    Please see Dependencies.txt or https://github.com/nanoporetech/medaka for more information about installing medaka.
-    Only medaka_consensus used in this pipeline.
-    '''
-    
-    print('----------------------------------\n')
-    print('Checking Medaka Args')
-    print('----------------------------------\n')
-    print('Input files: %s \nReference Files: %s \nOutput directory: %s \nThreads: %s'
-         % (reads, reference, outputDir, str(threads)))
-    
-    subprocess.run(['medaka_consensus -i %s -d %s -o %s -t %s -m r941_min_high_g344'
-                    % (reads, reference, outputDir, str(threads))], shell = True)
-    
-    processMedakaOutput(outputDir, reference, screenshot, igv)
-    
-    return 
 
 
 def filterReads(reads, maxLength, minLength, quality, porechop, medaka):
@@ -218,128 +205,6 @@ def filterReads(reads, maxLength, minLength, quality, porechop, medaka):
         sys.exit('Done: Filtered Reads written to "filtered_output.fastq" no Porechop or Medaka called')
     
     return new_reads
-
-    
-def processMedakaOutput(outputDir, reference, screenshot, igv = None):
-    '''
-    Splits the consensus.fasta file that was generated by Medaka into individual plasmid seqs.
-    Processes calls_to_draft.bam to filter out supplemental alignments and make index of that. 
-    '''
-    if os.path.isdir(outputDir):
-        filePath = outputDir+'/consensus.fasta'
-        consensusFasta = file_object = open(filePath, 'rt')
-        for line in consensusFasta:
-            if line.startswith('>'):
-                header = line.split(' ')[0]  
-            else:
-                seq = line
-                out = open('%s/%s.fasta' % (outputDir, header[1:-1]), 'w')
-                out.write('%s \n%s' % (header, seq))
-    
-    subprocess.run(['samtools view -bq 1 %s/calls_to_draft.bam > %s/final_processed.bam' %
-                    (outputDir, outputDir)], shell = True)
-    subprocess.run(['samtools index %s/final_processed.bam' % outputDir], shell = True)
-    
-                
-    #Run take screenshots based on final_processed.bam    
-    if screenshot:
-        takeScreenshots(reference, outputDir, igv)        
-        
-        
-def runPorechop(reads, outputDir, barcodes, barcodeThreshold, threads, endSize, iterations, screenshot, igv):
-    '''
-    As of 20200218: Relies on CM fork of rrwick's Porechop.
-    This function sets up target directories for running Porechop with input reads, the sequence that will be used for
-    custom barcoding as well as other Porechop specific parameters. Outputs that were written to various directories are
-    processed with processPorechopOutput.
-    '''
-    
-    if not os.path.isdir(outputDir):
-            os.makedirs(outputDir)
-            
-    detailsOut = open(os.path.join(outputDir, 'run_details.txt'), 'wt')
-    
-    detailsOut.write('Porechop run details \n'
-                     '_____________________________________\n'
-                     'Input files: %s \nBarcodes: %s \nOutput Directory:'
-                     '%s \nBarcode Threshold: %s \nThreads: %s \nEnd Size: %s \nInterations %s\n'
-                     '_____________________________________\n'
-         % (reads, barcodes, outputDir, barcodeThreshold, str(threads), str(endSize), str(iterations)))
-    
-    detailsOut.close()
-    
-    for x in range(int(iterations)):
-        
-        baseRun = 'porechop -i %s -b %s -BC %s -t %s --barcode_threshold %s \
-        --no_split --untrimmed -v 0 --end_size %s --discard_unassigned'
-
-        subprocess.run([baseRun % (reads, outputDir + '/' + 'porechop_'+str(x),
-                                       barcodes, str(threads), str(barcodeThreshold), str(endSize))], shell = True)
-            
-    processPorechopOutput(outputDir, iterations, barcodes, screenshot, igv)
-    
-    return
-
-def processPorechopOutput(outputDir, iterations, barcodes, screenshot, igv):
-    '''
-    Looks in all the directories make by Porechop and concatinates the run information into runSummary
-    and cats the runs together for minimap2. Zips the fastq files that were assigned to each bin.
-    '''
-    
-    #This causes problems if you name multiple output directories similar names. I recommend using the date
-    #All the run info will be included in an output file, so a very descriptive name is not necessary
-    paths = [path for path in os.listdir(outputDir) if path.startswith('porechop_')]
-                
-    runSummary = open(outputDir+'/run_details.txt', 'a+')
-    
-    print(str(paths))
-        
-    for directory in range(len(paths)):
-        
-        subprocess.run(['cat %s/run_details.txt >> %s/run_details.txt' % 
-                            (outputDir + '/' + paths[directory], outputDir)], shell = True)
-
-        subprocess.run(['cat %s/*.fastq >> %s/all_binned.fastq' %
-                            (outputDir + '/' + paths[directory], outputDir)], shell = True)
-
-        subprocess.run(['gzip %s/*.fastq' % (outputDir + '/' + paths[directory])], shell = True)
-            
-    runSummary.close()
-       
-    runMinimap2(outputDir, barcodes, screenshot, igv)
-        
-    return 
-
-        
-def runMinimap2(outputDir, reference, screenshot, igv):
-    '''
-    Maps the filtered reads from Porechop processing. Then filters and sorts the alignments. 
-    Calls takeScreenshots if args.screenshot == True.
-    
-    Args:
-    reference - plasmid fasta
-    outoutDir - output directory for reading and writing
-    igv - Path to igv.sh
-    
-    '''
-    
-    finalReads = outputDir + '/allBinned.fastq'
-    
-    minimap2Run = 'minimap2 -ax map-ont -L %s %s | samtools view -bq 1 | samtools sort -o %s'
-    
-    subprocess.run([minimap2Run %
-                    (reference, outputDir+'/all_binned.fastq', outputDir+'/filtered_sorted_reads.bam')], shell = True)
-    
-    subprocess.run(['samtools markdup -r %s/filtered_sorted_reads.bam %s/final_processed.bam' % 
-                    (outputDir, outputDir)], shell = True)
-    
-    subprocess.run(['samtools index %s/final_processed.bam' % (outputDir)], shell = True)
-    
-    if screenshot:
-        
-        takeScreenshots(reference, outputDir, igv)
-        
-    return 
 
 
 def takeScreenshots(reference, outputDir, igv):
