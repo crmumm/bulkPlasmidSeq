@@ -86,7 +86,7 @@ def getArgs():
     porechop = porechopArgs.add_argument_group('Porechop Specific arguments')
     porechop.add_argument('--barcode_threshold', required = False, default = 75)
     porechop.add_argument('--end_size', required = False, default = 250)
-    porechop.add_argument('-rounds', '--porechop_iterations', required = False, default = 1,
+    porechop.add_argument('--rounds', '--porechop_iterations', required = False, default = 1,
                               help = 'Number of rounds of Porechop binning')
     
     #IGV screenshot args Porchop
@@ -157,6 +157,13 @@ def loadReads(inputFiles, referenceFiles, outputDir):
     directories, this function concatenates the .fasta or fastq files to make the input reads easier to work with
     and the plasmids into a 'Plasmid Genome.' Checks that outputDir is not a file.
     '''
+    if os.path.isfile(outputDir):
+        sys.exit('It looks like your output directory exists exists as a file. Please remove this file or change where' 
+                 'you want the output to be written to')
+        
+    elif os.path.exists(outputDir) == False:
+        subprocess.run(['mkdir %s' % outputDir], shell = True)
+        
     if os.path.exists(inputFiles) == False:
         sys.exit('Input reads not found')
         
@@ -164,8 +171,8 @@ def loadReads(inputFiles, referenceFiles, outputDir):
         
         print('Directory was given for input reads, concatenating these to output_reads.fastq')
         
-        subprocess.run(['cat %s/*.fastq > input_reads.fastq' % inputFiles], shell = True)
-        reads = 'input_reads.fastq'
+        subprocess.run(['cat %s/*.fastq > %s/input_reads.fastq' % (inputFiles, outputDir)], shell = True)
+        reads = '%s/input_reads.fastq' % outputDir
                                           
     elif os.path.isfile(inputFiles):
         #Checks if fastq format
@@ -182,8 +189,8 @@ def loadReads(inputFiles, referenceFiles, outputDir):
 
         print('Directory was given for plasmid reference, concatenating these to output_ref.fasta')
 
-        subprocess.run(['cat %s/*.fa* > plasmid_genome_ref.fasta' % referenceFiles], shell = True)
-        reference = 'plasmid_genome_ref.fasta'
+        subprocess.run(['cat %s/*.fa* > %s/plasmid_genome_ref.fasta' % (referenceFiles, outputDir)], shell = True)
+        reference = '%s/plasmid_genome_ref.fasta' % outputDir
 
 
     elif os.path.isfile(referenceFiles):
@@ -192,10 +199,6 @@ def loadReads(inputFiles, referenceFiles, outputDir):
             reference = referenceFiles
         else:
             sys.exit('Error: Reference sequence should be in .fasta or .fa format')
-    
-    if os.path.isfile(outputDir):
-        sys.exit('It looks like your output directory exists exists as a file. Please remove this file or change where' 
-                 'you want the output to be written to')
                 
     else:
         reference = referenceFiles
