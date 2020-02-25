@@ -1,21 +1,19 @@
 import os
 import sys
-import shutil
+#import shutil
 import subprocess
 
-import bulkPlasmidSeq as main
+import bulkPlasmidSeq
 
 def run(reads, reference, outputDir, args):
     '''
     Checks that all the necessary inputs are provided. Note that -BC is used for building custom barcodes
     and also later as a reference for minimap. 
     '''
-    
-    #I am actively choosing to rewrite how Porechop handles arguments -BC/-reference
     if None not in (reference, outputDir):
         try:
             runPorechop(reads, outputDir, reference, args.barcode_threshold,
-                    args.threads, args.end_size, args.porechop_iterations, args.screenshot, args.igv)
+                    args.threads, args.end_size, args.rounds, args.screenshot, args.igv)
     
         except IOError:
             sys.exit('IO error: check that you have activated medaka conda environment/ medaka_consensus available')
@@ -94,7 +92,7 @@ def runMinimap2(outputDir, reference, screenshot, igv):
     Args:
     reference - plasmid fasta
     outoutDir - output directory for reading and writing
-    igv - Path to igv.sh
+    igv, screenshot - Path to igv.sh, screenshot must be true
     
     '''
     
@@ -112,6 +110,6 @@ def runMinimap2(outputDir, reference, screenshot, igv):
     
     if screenshot:
         
-        main.takeScreenshots(reference, outputDir, igv)
+        bulkPlasmidSeq.takeScreenshots(reference, outputDir, igv)
         
     return 

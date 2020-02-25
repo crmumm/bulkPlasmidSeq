@@ -1,9 +1,7 @@
 import os
 import sys
-import shutil
 import subprocess
-
-import bulkPlasmidSeq as main
+import bulkPlasmidSeq 
 
 def run(reads, reference, outputDir, args):
     '''
@@ -67,4 +65,4 @@ def processMedakaOutput(outputDir, reference, screenshot, igv = None):
                 
     #Run take screenshots based on final_processed.bam    
     if screenshot:
-        main.takeScreenshots(reference, outputDir, igv)     
+        bulkPlasmidSeq.takeScreenshots(reference, outputDir, igv)     

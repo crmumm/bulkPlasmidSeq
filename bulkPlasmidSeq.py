@@ -1,13 +1,13 @@
 '''
 Camille Mumm - Boyle Lab rotation 2020
 
-Uses Medaka (https://github.com/nanoporetech/medaka) and Porechop (https://github.com/rrwick/Porechop)
-to process reads from bulk plasmid sequencing. 
+Uses Medaka (https://github.com/nanoporetech/medaka), Porechop (https://github.com/rrwick/Porechop),
+and NanoFilt (https://github.com/wdecoster/nanofilt) to process reads from bulk plasmid sequencing. 
 '''
 import argparse
 import os
 import sys
-import shutil
+#import shutil
 import subprocess
 
 
@@ -15,14 +15,14 @@ def pick_submodule(args):
     
     if None not in (args.input_reads, args.reference, args.output_dir):
     
-        reads, reference, outputDir = loadReads(args.input_reads, args.reference, args.output_dir)
+        reads, reference, outputDir = loadReads(args.input_reads, args.reference, args.output_dir, args.double)
     
     else:
         sys.exit('Missing one of the following arguments, --input(-i), --reference(-r), --output_dir(-o)')
         
     if args.filter == True:
         
-        reads = filterReads(reads, args.max_length, args.min_length, args.min_quality)
+        reads = filterReads(reads, outputDir, args.max_length, args.min_length, args.min_quality)
     
     if args.submod == 'Porechop':
         import porechop_wrap as submod
@@ -49,8 +49,8 @@ def main():
         
         python bulkPlasmidSeq.py Porechop -i 'path/to/reads' -o outputDirectory -BC 'path/to/plasmids' --end_size 1000 -N 3        
     '''
-    #20200220 Notes, I'm trying to make the Porechop and Medaka functionalities more separate 
-    #Modeling this after arq5x's poretools submodule calling structure
+    #Modeling submodule picking after arq5x's poretools structure
+    #Get args, picking of submodule runs in here
     args = getArgs()
             
     
@@ -58,30 +58,31 @@ def getArgs():
     '''
     Parses arguments:
         - See -h, --help
+        
+    Many of the arguments (ex. input, reference, output) are redundant because they go with both submodules.
     
     '''
     ap = argparse.ArgumentParser()
     subparsers = ap.add_subparsers(title='[sub-commands]', dest='submod')
-        
-    ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
-    ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
-    ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
 
+    ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
     
     #Porechop Args
     porechopArgs = subparsers.add_parser('Porechop')
     
-    generalArgs = porechopArgs.add_argument_group('General Arguments')
-    generalArgs.add_argument('-i', '--input_reads', required = True,
+    generalArgsPorechop = porechopArgs.add_argument_group('General Arguments')
+    generalArgsPorechop.add_argument('-i', '--input_reads', required = True,
                           help= 'input reads (directory to reads or .fastq)')
-    generalArgs.add_argument('-r', '--reference', required = True,
+    generalArgsPorechop.add_argument('-r', '--reference', required = True,
                           help = 'plasmid sequences (directory or .fa)')
-    generalArgs.add_argument('-o', '--output_dir', required = True,
+    generalArgsPorechop.add_argument('-o', '--output_dir', required = True,
                           help = 'output directory')
-    generalArgs.add_argument('-t', '--threads', required = False, default = 2,
+    generalArgsPorechop.add_argument('-t', '--threads', required = False, default = 2,
                           help = 'number of threads, default 2')
-    generalArgs.add_argument('--filter', required = False, action='store_true',
+    generalArgsPorechop.add_argument('--filter', required = False, action='store_true',
                        default = False, help = 'Filter reads before analysis')
+    generalArgsPorechop.add_argument('--double', required = False, action = 'store_true', default = False,
+                          help = 'Double the reference genome, great for visualization, bad for binning and consensus')
     
     porechop = porechopArgs.add_argument_group('Porechop Specific arguments')
     porechop.add_argument('--barcode_threshold', required = False, default = 75)
@@ -95,19 +96,22 @@ def getArgs():
                      help = 'Take screenshots of IGV for each plasmid')
     igvPorechop.add_argument('--igv', required = False, default = None, help = 'Path to igv.sh')
     
-    #NanoFilt args
-    nanofilt = porechopArgs.add_argument_group('Nanofilt arguments')
-    nanofilt.add_argument('--max_length', required = False, default = 100000, help = 'Filtering reads by maximum length')
-    nanofilt.add_argument('--min_length', required = False, default = 0,  help = 'Filtering reads by minimum length')
-    nanofilt.add_argument('-q', '--min_quality', required = False, default = 7, help = 'Filter reads by quality score > N')
+    #NanoFilt args Porechop
+    nanofiltPorechop = porechopArgs.add_argument_group('Nanofilt arguments')
+    nanofiltPorechop.add_argument('--max_length', required = False, default = 100000,
+                                  help = 'Filtering reads by maximum length')
+    nanofiltPorechop.add_argument('--min_length', required = False, default = 0,
+                                  help = 'Filtering reads by minimum length')
+    nanofiltPorechop.add_argument('-q', '--min_quality', required = False, default = 7,
+                                  help = 'Filter reads by quality score > N')
     
     porechopArgs.set_defaults(func=pick_submodule)
             
     ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
-    ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
-    ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
     
-    #Medaka takes no additional args but I'd like to separate them
+    #Medaka Args, the only Medaka specific arg is --double for double genome visualization
+    #Didn't make an argument group for that alone, add to general
+    
     medakaArgs = subparsers.add_parser('Medaka')
     generalArgsMedaka = medakaArgs.add_argument_group('General Arguments')
     generalArgsMedaka.add_argument('-i', '--input_reads', required=False,
@@ -119,8 +123,9 @@ def getArgs():
     generalArgsMedaka.add_argument('-t', '--threads', required = False, default = 2,
                           help = 'number of threads, default 2')
     
-    generalArgsMedaka.add_argument('--info', required = False, help = 
-                           'Medaka takes no additional args, thanks for using this submodule')
+    generalArgsMedaka.add_argument('--double', required = False, action = 'store_true', default = False,
+                          help = 'Double the reference genome, great for visualization, less for consensus generation')
+    
     generalArgsMedaka.add_argument('--filter', required = False, action='store_true',
                        default = False, help = 'Filter reads before analysis')
     
@@ -132,10 +137,13 @@ def getArgs():
     
     
     #NanoFilt args
-    nanofilt = medakaArgs.add_argument_group('Nanofilt arguments')
-    nanofilt.add_argument('--max_length', required = False, default = 100000, help = 'Filtering reads by maximum length')
-    nanofilt.add_argument('--min_length', required = False, default = 0,  help = 'Filtering reads by minimum length')
-    nanofilt.add_argument('-q', '--min_quality', required = False, default = 7, help = 'Filter reads by quality score > N')
+    nanofiltMedaka= medakaArgs.add_argument_group('Nanofilt arguments')
+    nanofiltMedaka.add_argument('--max_length', required = False, default = 100000,
+                                help = 'Filtering reads by maximum length, default is 1Mb')
+    nanofiltMedaka.add_argument('--min_length', required = False, default = 0,
+                                help = 'Filtering reads by minimum length, default is 0')
+    nanofiltMedaka.add_argument('-q', '--min_quality', required = False, default = 7,
+                                help = 'Filter reads by quality score > N, default is 7')
     
     medakaArgs.set_defaults(func=pick_submodule)
     
@@ -150,8 +158,7 @@ def getArgs():
     return args
 
 
-def loadReads(inputFiles, referenceFiles, outputDir):
-    print(inputFiles, referenceFiles, outputDir)
+def loadReads(inputFiles, referenceFiles, outputDir, double = False):
     '''
     This function checks to make the input, reference, and outputDir. If input or reference arguments are
     directories, this function concatenates the .fasta or fastq files to make the input reads easier to work with
@@ -161,17 +168,17 @@ def loadReads(inputFiles, referenceFiles, outputDir):
         sys.exit('It looks like your output directory exists exists as a file. Please remove this file or change where' 
                  'you want the output to be written to')
         
-    elif os.path.exists(outputDir) == False:
+    elif not os.path.exists(outputDir):
         subprocess.run(['mkdir %s' % outputDir], shell = True)
         
-    if os.path.exists(inputFiles) == False:
+    if not os.path.exists(inputFiles):
         sys.exit('Input reads not found')
         
     elif os.path.isdir(inputFiles):
         
         print('Directory was given for input reads, concatenating these to output_reads.fastq')
-        
         subprocess.run(['cat %s/*.fastq > %s/input_reads.fastq' % (inputFiles, outputDir)], shell = True)
+        
         reads = '%s/input_reads.fastq' % outputDir
                                           
     elif os.path.isfile(inputFiles):
@@ -181,14 +188,12 @@ def loadReads(inputFiles, referenceFiles, outputDir):
         else:
             sys.exit('Error: Reads should be in .fastq format ')
     
-    if os.path.exists(referenceFiles) == False:
+    if not os.path.exists(referenceFiles):
         sys.exit('Reference not found')
     
 
     elif os.path.isdir(referenceFiles):
-
         print('Directory was given for plasmid reference, concatenating these to output_ref.fasta')
-
         subprocess.run(['cat %s/*.fa* > %s/plasmid_genome_ref.fasta' % (referenceFiles, outputDir)], shell = True)
         reference = '%s/plasmid_genome_ref.fasta' % outputDir
 
@@ -199,22 +204,36 @@ def loadReads(inputFiles, referenceFiles, outputDir):
             reference = referenceFiles
         else:
             sys.exit('Error: Reference sequence should be in .fasta or .fa format')
-                
+    
+    if double:
+        print('\n Double is True, duplicating the reference sequence, used for visualization \n')
+        #Duplicates the plasmids in the reference, used as an argument with Medaka. 
+        #Great for visualization, not good for binning or consensus polishing
+        seqs = getFasta(reference)
+        double = open('%s/double_reference_genome.fasta' % outputDir, 'a+')
+        for seq in seqs:
+            double.write('>' + seq[0] + '\n')
+            double.write(seq[1])
+            double.write(seq[1] + '\n')
+
+        double.close()
+        reference = '%s/double_reference_genome.fasta' % outputDir
+    
     else:
         reference = referenceFiles
             
     return reads, reference, outputDir
 
 
-def filterReads(reads, maxLength, minLength, quality):
+def filterReads(reads, outputDir, maxLength, minLength, quality):
     '''
     Filters reads using NanoFilt. More options are available if you use NanoFilt itself please see
     https://github.com/wdecoster/nanofilt for more information. This program only allows for read length and q score 
     filtering. If filtering first, please remember to change your input path for further analysis. 
     '''
     
-    subprocess.run(['NanoFilt -q %s -l %s --maxlength %s %s> filtered_output.fastq' %
-                    (quality, minLength, maxLength, reads)], shell = True)
+    subprocess.run(['NanoFilt -q %s -l %s --maxlength %s %s> %s/filtered_output.fastq' %
+                    (quality, minLength, maxLength, reads, outputDir)], shell = True)
     
     new_reads = 'filtered_output.fastq'
     
@@ -224,7 +243,7 @@ def filterReads(reads, maxLength, minLength, quality):
 def takeScreenshots(reference, outputDir, igv):
     '''
     Uses batch screenshot functionality of IGV to take images of the alignment for each plasmid:
-    
+    Makes a .bat file in output dir.
     Args:
     reference - plasmid fasta
     outoutDir - output directory for reading and writing
@@ -240,7 +259,7 @@ def takeScreenshots(reference, outputDir, igv):
                 
     stringForIGV = ''
     for plasmid in plasmidList:
-        #Sleeping between commands as a workaround of Java bug
+        #Sleeping between commands as a workaround of IGV bug
         stringForIGV += 'goto %s\nsnapshot\nsetSleepInterval 10\n' % (plasmid)
     
     igvBatch = open('%s/igv_screenshot.bat'% outputDir, 'wt')
@@ -253,7 +272,35 @@ def takeScreenshots(reference, outputDir, igv):
     igvBatch.close()
     #Run igv.sh -b batchfile.bat
     subprocess.run(['%s -b %s' % (igv, outputDir + '/igv_screenshot.bat')], shell = True)
+                            
     
+def getFasta(file):
+    '''
+    Returns list of tuples (name, seq) for each plasmid in .fasta 
+    From b529 data_readers.py
+    '''
+    file = open(file, 'rt')
+    name=''
+    seq=''
+    fastaList = []
+    for line in file:
+        # Capture the next header, report what we have, and update
+        if line.startswith('>') and seq: #not first seq
+            name = name[1:] #removes the carrot
+            fastaList.append((name, seq))
+            name=line.strip()
+            seq=''
+            # Get to the first header
+        elif line.startswith('>'):  #first seq
+            name=line.strip()
+        # Just add sequence if it is the only thing there
+        else:
+            seq+=line.strip()
+        # At the end, return the last entries
+    if name and seq: #last seq
+        name = name[1:]
+        fastaList.append((name, seq))                           
+    return fastaList
        
 if __name__ == "__main__":
     main()

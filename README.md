@@ -21,11 +21,11 @@ Dependencies:
         
     Porechop
     
-        Porechop is officially unsupported by Nanopore, but is one of the better tools if using custom barcodes. 
+        Porechop is deprecated, but is one of the better tools if you are supplying barcodes. 
         For custom barcoding, using sequence features other than the ligated ONT barcodes, please use crmumm's 
         fork of Porechop. This integrates barcoding.py into Porechop. 
     
-            git clone https://github.com/rrwick/Porechop.git
+            git clone https://github.com/crmumm/Porechop.git
             cd Porechop
             python3 setup.py install
             
@@ -34,7 +34,7 @@ Dependencies:
     NanoFilt
     
         One of several available long read filtering softwares, NanoFilt has the advantage of specifying
-        the maximimum read length which is good for filtering out extra long reads.
+        the maximimum read length which is good for filtering out extra long reads. 
             
             pip install nanofilt
             pip install nanofilt --upgrade
@@ -55,7 +55,7 @@ Dependencies:
     
     For binning sequences based on reference - Porechop:
   
-        python bulkPlasmidSeq.py Porechop -i path/to/reads -r path/to/plasmids -o output_directory
+        python bulkPlasmidSeq.py Porechop -i path/to/reads -r path/to/plasmids -o output_directory --rounds 8
         
         python bulkPlasmidSeq.py Porechop -i path/to/reads -r path/to/plasmids -o output_directory --screenshot \
             --igv path/to/igv.sh
@@ -67,4 +67,4 @@ Dependencies:
         
     For unfiltered reads - Guppy filters to Q7 ~85% basecalling accuracy:
     
-        python bulkPlasmidSeq.py -i my_reads.fastq -r my_plasmid_genome.fa -q 8 
+        python bulkPlasmidSeq.py --filter -i unfiltered_reads.fastq -r my_plasmid_genome.fa -q 8 
