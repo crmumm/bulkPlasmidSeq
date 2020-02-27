@@ -1,13 +1,13 @@
 import os
 import sys
-#import shutil
 import subprocess
 
 import bulkPlasmidSeq
 
 def run(reads, reference, outputDir, args):
     '''
-    Checks that all the necessary inputs are provided. Note that -BC is used for building custom barcodes
+    Checks that all the necessary inputs are provided. The reference file that is used for alignment with minimap2
+    is used to generate custom barcodes.
     and also later as a reference for minimap. 
     '''
     if None not in (reference, outputDir):
@@ -45,7 +45,7 @@ def runPorechop(reads, outputDir, barcodes, barcodeThreshold, threads, endSize, 
     for x in range(int(iterations)):
         
         baseRun = 'porechop -i %s -b %s -BC %s -t %s --barcode_threshold %s \
-        --no_split --untrimmed -v 0 --end_size %s --discard_unassigned'
+        --no_split --untrimmed -v 0 --end_size %s --discard_unassigned --iterations'
 
         subprocess.run([baseRun % (reads, outputDir + '/' + 'porechop_'+str(x),
                                        barcodes, str(threads), str(barcodeThreshold), str(endSize))], shell = True)

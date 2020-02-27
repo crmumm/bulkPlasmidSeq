@@ -1,6 +1,7 @@
 import os
 import sys
 import subprocess
+
 import bulkPlasmidSeq 
 
 def run(reads, reference, outputDir, args):
@@ -34,8 +35,11 @@ def runMedaka(reads, reference, outputDir, threads, screenshot, igv):
     print('Input files: %s \nReference Files: %s \nOutput directory: %s \nThreads: %s'
          % (reads, reference, outputDir, str(threads)))
     
-    subprocess.run(['medaka_consensus -i %s -d %s -o %s -t %s -m r941_min_high_g344'
-                    % (reads, reference, outputDir, str(threads))], shell = True)
+    with open('medaka_log.txt', 'wt') as log:
+        # % (reads, reference, outputDir, str(threads))
+        subprocess.run(['medaka_consensus', '-i', str(reads), '-d', str(reference),
+                        '-o', str(outputDir), '-t', str(threads), '-m' 'r941_min_high_g344'],
+                       stdout = log, stderr = subprocess.DEVNULL)
     
     processMedakaOutput(outputDir, reference, screenshot, igv)
     

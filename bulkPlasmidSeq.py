@@ -7,7 +7,6 @@ and NanoFilt (https://github.com/wdecoster/nanofilt) to process reads from bulk 
 import argparse
 import os
 import sys
-#import shutil
 import subprocess
 
 
@@ -195,7 +194,9 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
     elif os.path.isdir(referenceFiles):
         print('Directory was given for plasmid reference, concatenating these to output_ref.fasta')
         subprocess.run(['cat %s/*.fa* > %s/plasmid_genome_ref.fasta' % (referenceFiles, outputDir)], shell = True)
+        print('\n looking at the reference' + str(referenceFiles))
         reference = '%s/plasmid_genome_ref.fasta' % outputDir
+        print('\n looking at the reference' + str(reference))
 
 
     elif os.path.isfile(referenceFiles):
@@ -206,7 +207,7 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
             sys.exit('Error: Reference sequence should be in .fasta or .fa format')
     
     if double:
-        print('\n Double is True, duplicating the reference sequence, used for visualization \n')
+        print('\n Double is True, duplicating the reference sequence, used for visualization  of plasmid fragmentation\n')
         #Duplicates the plasmids in the reference, used as an argument with Medaka. 
         #Great for visualization, not good for binning or consensus polishing
         seqs = getFasta(reference)
@@ -218,9 +219,6 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
 
         double.close()
         reference = '%s/double_reference_genome.fasta' % outputDir
-    
-    else:
-        reference = referenceFiles
             
     return reads, reference, outputDir
 
@@ -249,6 +247,9 @@ def takeScreenshots(reference, outputDir, igv):
     outoutDir - output directory for reading and writing
     igv - Path to igv.sh
     '''
+    print('----------------------------------\n')
+    print('Taking screenshots in IGV - writing images to %s/screenshots' % outputDir)
+    print('----------------------------------\n')
     
     subprocess.run(['mkdir %s/screenshots'% outputDir], shell = True)
     plasmidList = []
@@ -271,7 +272,8 @@ def takeScreenshots(reference, outputDir, igv):
     igvBatch.write(template)
     igvBatch.close()
     #Run igv.sh -b batchfile.bat
-    subprocess.run(['%s -b %s' % (igv, outputDir + '/igv_screenshot.bat')], shell = True)
+    #Quiet the java stdout 
+    subprocess.run(['%s' % igv, '-b',  '%s' %  outputDir + '/igv_screenshot.bat'], stdout = subprocess.DEVNULL)
                             
     
 def getFasta(file):
