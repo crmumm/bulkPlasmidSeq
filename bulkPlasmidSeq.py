@@ -108,7 +108,7 @@ def getArgs():
             
     ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
     
-    #Medaka Args, the only Medaka specific arg is --double for double genome visualization
+    #Medaka Args, the only Medaka specific arg is -m --model, for Pore and Guppy version
     #Didn't make an argument group for that alone, add to general
     
     medakaArgs = subparsers.add_parser('Medaka')
@@ -124,6 +124,8 @@ def getArgs():
     
     generalArgsMedaka.add_argument('--double', required = False, action = 'store_true', default = False,
                           help = 'Double the reference genome, great for visualization, less for consensus generation')
+    generalArgsMedaka.add_argument('-m', '--model', required = False, default = 'r941_min_high_g344',
+                          help = 'Medaka consensus model, Pore/Guppy version, use medaka tools list_models for list')
     
     generalArgsMedaka.add_argument('--filter', required = False, action='store_true',
                        default = False, help = 'Filter reads before analysis')

@@ -12,7 +12,7 @@ def run(reads, reference, outputDir, args):
         
     if None not in (reads, reference, outputDir):
         try:
-            runMedaka(reads, reference, outputDir, args.threads, args.screenshot, args.igv)
+            runMedaka(reads, reference, outputDir, args.threads, args.model, args.screenshot, args.igv)
             
         except IOError:
             sys.exit('IO error: check that you have activated medaka conda environment/ medaka_consensus available')
@@ -22,7 +22,7 @@ def run(reads, reference, outputDir, args):
 
 
 
-def runMedaka(reads, reference, outputDir, threads, screenshot, igv):
+def runMedaka(reads, reference, outputDir, threads, model, screenshot, igv):
     '''
     Takes the input reads, reference, and output directory (after being processed through loadReads) and runs Medaka.
     Please see Dependencies.txt or https://github.com/nanoporetech/medaka for more information about installing medaka.
@@ -35,10 +35,10 @@ def runMedaka(reads, reference, outputDir, threads, screenshot, igv):
     print('Input files: %s \nReference Files: %s \nOutput directory: %s \nThreads: %s'
          % (reads, reference, outputDir, str(threads)))
     
-    with open('medaka_log.txt', 'wt') as log:
-        # % (reads, reference, outputDir, str(threads))
+    with open('%s/medaka_log.txt' % outputDir, 'wt') as log:
+        # % (reads, reference, outputDir, str(threads)) 
         subprocess.run(['medaka_consensus', '-i', str(reads), '-d', str(reference),
-                        '-o', str(outputDir), '-t', str(threads), '-m' 'r941_min_high_g344'],
+                        '-o', str(outputDir), '-t', str(threads), '-m', str(model)],
                        stdout = log, stderr = subprocess.DEVNULL)
     
     processMedakaOutput(outputDir, reference, screenshot, igv)
