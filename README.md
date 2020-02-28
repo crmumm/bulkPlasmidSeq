@@ -49,9 +49,8 @@ Dependencies:
     
     Minimap2
     
-    
-    ______________________________________________________________________
-    BulkPlasmidSeq usage examples:
+______________________________________________________________________
+BulkPlasmidSeq usage examples:
     
     For binning sequences based on reference - Porechop:
   
@@ -68,3 +67,24 @@ Dependencies:
     For unfiltered reads - Guppy filters to Q7 ~85% basecalling accuracy:
     
         python bulkPlasmidSeq.py --filter -i unfiltered_reads.fastq -r my_plasmid_genome.fa -q 8 
+
+______________________________________________________________________
+
+Troubleshooting:
+
+     Common Problems:
+	
+	Taking screenshots with IGV crashes or gives a Null Pointer error.
+	
+		Make sure a .genome file has been created for this 'Plasmid Genome' and that
+		this genome is available in the genome dropdown list. This pipeline does not
+		create it the .genome file. To create this file open igv, go to Genomes
+		dropdown menu and use Create .genomes. Give the genome a name and point it to
+		the plasmid_genome.fasta created by the pileline or your reference fasta.  
+	
+	What happened to the reads that weren't binned with Porechop?
+
+		The Porechop wrapper runs Porechop with --discard_unassigned. To get a 'none'
+		bin remove this argument in runPorechop function in porechop_wrap.py. 
+
+	 

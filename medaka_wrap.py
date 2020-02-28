@@ -11,11 +11,9 @@ def run(reads, reference, outputDir, args):
     '''
         
     if None not in (reads, reference, outputDir):
-        try:
-            runMedaka(reads, reference, outputDir, args.threads, args.model, args.screenshot, args.igv)
+        
+        runMedaka(reads, reference, outputDir, args.threads, args.model, args.screenshot, args.igv)
             
-        except IOError:
-            sys.exit('IO error: check that you have activated medaka conda environment/ medaka_consensus available')
         
     else:
         sys.exit('Medaka needs input reads (-i), output directory (-o), and reference sequences (-r)')
@@ -30,16 +28,16 @@ def runMedaka(reads, reference, outputDir, threads, model, screenshot, igv):
     '''
     
     print('----------------------------------\n')
-    print('Checking Medaka Args')
+    print('Running Medaka with the following arguments, more info in medaka_log.txt')
     print('----------------------------------\n')
-    print('Input files: %s \nReference Files: %s \nOutput directory: %s \nThreads: %s'
-         % (reads, reference, outputDir, str(threads)))
+    print('Input files: %s \nReference Files: %s \nOutput directory: %s \nThreads: %s \nModel: %s\n'
+         % (reads, reference, outputDir, str(threads), model))
     
     with open('%s/medaka_log.txt' % outputDir, 'wt') as log:
-        # % (reads, reference, outputDir, str(threads)) 
+        # Quietly run medaka, make a medaka_log
         subprocess.run(['medaka_consensus', '-i', str(reads), '-d', str(reference),
                         '-o', str(outputDir), '-t', str(threads), '-m', str(model)],
-                       stdout = log, stderr = subprocess.DEVNULL)
+                       stdout = log, stderr = log, check = True)
     
     processMedakaOutput(outputDir, reference, screenshot, igv)
     
@@ -53,13 +51,14 @@ def processMedakaOutput(outputDir, reference, screenshot, igv = None):
     '''
     if os.path.isdir(outputDir):
         filePath = outputDir+'/consensus.fasta'
-        consensusFasta = file_object = open(filePath, 'rt')
+        subprocess.run(['mkdir', '%s/consensus_sequences' % outputDir])
+        consensusFasta = open(filePath, 'rt')
         for line in consensusFasta:
             if line.startswith('>'):
                 header = line.split(' ')[0]  
             else:
                 seq = line
-                out = open('%s/%s.fasta' % (outputDir, header[1:-1]), 'w')
+                out = open('%s/consensus_sequences/%s.fasta' % (outputDir, header[1:]), 'wt')
                 out.write('%s \n%s' % (header, seq))
     
     subprocess.run(['samtools view -bq 1 %s/calls_to_draft.bam > %s/final_processed.bam' %

@@ -40,13 +40,13 @@ def main():
     
     For alignment, polishing, and creating consensus without binning (Medaka):
     
-        python bulkPlasmidSeq.py Medaka -i 'path/to/reads' -r 'path/to/plasmids' -o outputDirectory
+        python bulkPlasmidSeq.py Medaka -i 'path/to/reads' -r 'path/to/plasmids' -o outputDirectory - t 2
     
     For binning and alignment (Porechop):
     
-        python bulkPlasmidSeq.py Porechop -i 'path/to/reads' -o outputDirectory -BC 'path/to/plasmids'
+        python bulkPlasmidSeq.py Porechop -i 'path/to/reads' -o outputDirectory -r 'path/to/plasmids.fasta'
         
-        python bulkPlasmidSeq.py Porechop -i 'path/to/reads' -o outputDirectory -BC 'path/to/plasmids' --end_size 1000 -N 3        
+        python bulkPlasmidSeq.py Porechop -i 'path/to/reads' -o outputDirectory -r 'path/to/plasmids' --end_size 500 -N 8        
     '''
     #Modeling submodule picking after arq5x's poretools structure
     #Get args, picking of submodule runs in here
@@ -81,7 +81,7 @@ def getArgs():
     generalArgsPorechop.add_argument('--filter', required = False, action='store_true',
                        default = False, help = 'Filter reads before analysis')
     generalArgsPorechop.add_argument('--double', required = False, action = 'store_true', default = False,
-                          help = 'Double the reference genome, great for visualization, bad for binning and consensus')
+                          help = 'Double the reference genome, great for visualization, less for consensus generation')
     
     porechop = porechopArgs.add_argument_group('Porechop Specific arguments')
     porechop.add_argument('--barcode_threshold', required = False, default = 75)
@@ -121,7 +121,6 @@ def getArgs():
                           help = 'output directory')
     generalArgsMedaka.add_argument('-t', '--threads', required = False, default = 2,
                           help = 'number of threads, default 2')
-    
     generalArgsMedaka.add_argument('--double', required = False, action = 'store_true', default = False,
                           help = 'Double the reference genome, great for visualization, less for consensus generation')
     generalArgsMedaka.add_argument('-m', '--model', required = False, default = 'r941_min_high_g344',
@@ -165,9 +164,9 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
     directories, this function concatenates the .fasta or fastq files to make the input reads easier to work with
     and the plasmids into a 'Plasmid Genome.' Checks that outputDir is not a file.
     '''
+    
     if os.path.isfile(outputDir):
-        sys.exit('It looks like your output directory exists exists as a file. Please remove this file or change where' 
-                 'you want the output to be written to')
+        sys.exit('Output directory exists exists as a file.')
         
     elif not os.path.exists(outputDir):
         subprocess.run(['mkdir %s' % outputDir], shell = True)
@@ -176,9 +175,14 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
         sys.exit('Input reads not found')
         
     elif os.path.isdir(inputFiles):
+        #print('Directory was given for input reads, concatenating these to output_reads.fastq \n')
         
-        print('Directory was given for input reads, concatenating these to output_reads.fastq')
-        subprocess.run(['cat %s/*.fastq > %s/input_reads.fastq' % (inputFiles, outputDir)], shell = True)
+        try:
+            subprocess.run(['cat %s/*.fastq > %s/input_reads.fastq' % (inputFiles, outputDir)],
+                       check = True, shell = True)
+            
+        except subprocess.CalledProcessError:
+            sys.exit('Could find reads in directory, check for fastq files in input')
         
         reads = '%s/input_reads.fastq' % outputDir
                                           
@@ -194,11 +198,16 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
     
 
     elif os.path.isdir(referenceFiles):
-        print('Directory was given for plasmid reference, concatenating these to output_ref.fasta')
-        subprocess.run(['cat %s/*.fa* > %s/plasmid_genome_ref.fasta' % (referenceFiles, outputDir)], shell = True)
-        print('\n looking at the reference' + str(referenceFiles))
+        #print('Directory was given for plasmid reference, concatenating these to output_ref.fasta \n')
+        
+        try:
+            subprocess.run(['cat %s/*.fa* > %s/plasmid_genome_ref.fasta' %
+                            (referenceFiles, outputDir)], shell = True, check = True)
+            
+        except subprocess.CalledProcessError:
+            sys.exit('Could not find reference plasmid sequences')
+            
         reference = '%s/plasmid_genome_ref.fasta' % outputDir
-        print('\n looking at the reference' + str(reference))
 
 
     elif os.path.isfile(referenceFiles):
@@ -211,7 +220,7 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
     if double:
         print('\n Double is True, duplicating the reference sequence, used for visualization  of plasmid fragmentation\n')
         #Duplicates the plasmids in the reference, used as an argument with Medaka. 
-        #Great for visualization, not good for binning or consensus polishing
+        #Great for visualization, not consensus generation/polishing
         seqs = getFasta(reference)
         double = open('%s/double_reference_genome.fasta' % outputDir, 'a+')
         for seq in seqs:
@@ -253,7 +262,7 @@ def takeScreenshots(reference, outputDir, igv):
     print('Taking screenshots in IGV - writing images to %s/screenshots' % outputDir)
     print('----------------------------------\n')
     
-    subprocess.run(['mkdir %s/screenshots'% outputDir], shell = True)
+    subprocess.run(['mkdir', '%s/screenshots' % outputDir])
     plasmidList = []
     with open(reference, 'rt') as f:#Determine what screenshots to take based on reference
         for line in f:
@@ -273,15 +282,19 @@ def takeScreenshots(reference, outputDir, igv):
     
     igvBatch.write(template)
     igvBatch.close()
+    
+    if not igv.lower().endswith('.sh'):
+        sys.exit('\n Taking screenshots needs path to igv.sh \n')
+        
     #Run igv.sh -b batchfile.bat
     #Quiet the java stdout 
-    subprocess.run(['%s' % igv, '-b',  '%s' %  outputDir + '/igv_screenshot.bat'], stdout = subprocess.DEVNULL)
+    
+    subprocess.run(['%s' % igv, ' -b',  ' %s' % (outputDir+ '/igv_screenshot.bat')])
                             
     
 def getFasta(file):
     '''
     Returns list of tuples (name, seq) for each plasmid in .fasta 
-    From b529 data_readers.py
     '''
     file = open(file, 'rt')
     name=''

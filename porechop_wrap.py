@@ -10,13 +10,10 @@ def run(reads, reference, outputDir, args):
     is used to generate custom barcodes.
     and also later as a reference for minimap. 
     '''
-    if None not in (reference, outputDir):
-        try:
-            runPorechop(reads, outputDir, reference, args.barcode_threshold,
+    if None not in (reads, reference, outputDir):
+        runPorechop(reads, outputDir, reference, args.barcode_threshold,
                     args.threads, args.end_size, args.rounds, args.screenshot, args.igv)
     
-        except IOError:
-            sys.exit('IO error: check that you have activated medaka conda environment/ medaka_consensus available')
             
     else:
         sys.exit('Porechop needs input reads (-i), output directory (-o), and barcodes (-BC)')
@@ -40,12 +37,13 @@ def runPorechop(reads, outputDir, barcodes, barcodeThreshold, threads, endSize, 
                      '%s \nBarcode Threshold: %s \nThreads: %s \nEnd Size: %s \nInterations %s\n'
                      '_____________________________________\n'
          % (reads, barcodes, outputDir, barcodeThreshold, str(threads), str(endSize), str(iterations)))
+    
     detailsOut.close()
     
     for x in range(int(iterations)):
         
         baseRun = 'porechop -i %s -b %s -BC %s -t %s --barcode_threshold %s \
-        --no_split --untrimmed -v 0 --end_size %s --discard_unassigned --iterations'
+        --no_split --untrimmed -v 0 --end_size %s --discard_unassigned'
 
         subprocess.run([baseRun % (reads, outputDir + '/' + 'porechop_'+str(x),
                                        barcodes, str(threads), str(barcodeThreshold), str(endSize))], shell = True)
@@ -60,9 +58,7 @@ def processPorechopOutput(outputDir, iterations, barcodes, screenshot, igv):
     Looks in all the directories make by Porechop and concatinates the run information into runSummary
     and cats the runs together for minimap2. Zips the fastq files that were assigned to each bin.
     '''
-    
-    #This causes problems if you name multiple output directories similar names. I recommend using the date
-    #All the run info will be included in an output file, so a very descriptive name is not necessary
+    #Generates a list of paths that should have the reads and info for each iteration of Porechop
     paths = [path for path in os.listdir(outputDir) if path.startswith('porechop_')]
                 
     runSummary = open(outputDir+'/run_details.txt', 'a+')
