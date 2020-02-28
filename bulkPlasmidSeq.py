@@ -240,11 +240,16 @@ def filterReads(reads, outputDir, maxLength, minLength, quality):
     https://github.com/wdecoster/nanofilt for more information. This program only allows for read length and q score 
     filtering. If filtering first, please remember to change your input path for further analysis. 
     '''
+    print('----------------------------------\n')
+    print('Filtering reads with NanoFilt: \nMin Length: %s \nMax Length: %s \nQ score: %s \n'
+          % (minLength, maxLength, quality))
+    print('Output: filtered_reads.fastq')
+    print('----------------------------------\n')
     
-    subprocess.run(['NanoFilt -q %s -l %s --maxlength %s %s> %s/filtered_output.fastq' %
+    subprocess.run(['NanoFilt -q %s -l %s --maxlength %s %s> %s/filtered_reads.fastq' %
                     (quality, minLength, maxLength, reads, outputDir)], shell = True)
     
-    new_reads = 'filtered_output.fastq'
+    new_reads = 'filtered_reads.fastq'
     
     return new_reads
 
