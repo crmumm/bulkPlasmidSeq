@@ -200,12 +200,24 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
     elif os.path.isdir(referenceFiles):
         #print('Directory was given for plasmid reference, concatenating these to output_ref.fasta \n')
         
-        try:
-            subprocess.run(['cat %s/*.fa* > %s/plasmid_genome_ref.fasta' %
-                            (referenceFiles, outputDir)], shell = True, check = True)
+        inRefFiles = os.listdir(referenceFiles)
+        keep = []
+        [keep.append(referenceFiles + keepFile) for keepFile in inRefFiles \
+         if keepFile.endswith('.fa') or keepFile.endswith('.fasta')]
+        
+        print(keep)
+        
+        with open('%s/plasmid_genome_ref.fasta' % outputDir, 'wb') as outfile:
+            for f in keep:
+                with open(f, "rb") as infile:
+                    outfile.write(infile.read())
+        
+        #try:
+            #subprocess.run(['cat %s/> %s/plasmid_genome_ref.fasta' %
+            #(referenceFiles, outputDir)], shell = True, check = True)
             
-        except subprocess.CalledProcessError:
-            sys.exit('Could not find reference plasmid sequences')
+        #except subprocess.CalledProcessError:
+            #sys.exit('Could not find reference plasmid sequences')
             
         reference = '%s/plasmid_genome_ref.fasta' % outputDir
 
@@ -230,7 +242,7 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
 
         double.close()
         reference = '%s/double_reference_genome.fasta' % outputDir
-            
+         
     return reads, reference, outputDir
 
 
