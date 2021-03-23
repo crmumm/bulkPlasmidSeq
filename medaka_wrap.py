@@ -6,7 +6,7 @@ import bulkPlasmidSeq
 
 def run(reads, reference, outputDir, args):
     '''
-    Running Medaka, check that Porechop is false. Takes as input fastq reads or directory to reads,
+    Takes as input fastq reads or directory to reads,
     a fasta file with all the plasmid or directory pointing to the plasmid files. 
     '''
         

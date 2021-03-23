@@ -1,8 +1,8 @@
 '''
-Camille Mumm - Boyle Lab rotation 2020
+Camille Mumm - Boyle Lab 2021
 
-Uses Medaka (https://github.com/nanoporetech/medaka), Porechop (https://github.com/rrwick/Porechop),
-and NanoFilt (https://github.com/wdecoster/nanofilt) to process reads from bulk plasmid sequencing. 
+Uses Medaka (https://github.com/nanoporetech/medaka) and 
+NanoFilt (https://github.com/wdecoster/nanofilt) to process reads from bulk plasmid sequencing. 
 '''
 import argparse
 import os
@@ -23,11 +23,10 @@ def pick_submodule(args):
         
         reads = filterReads(reads, outputDir, args.max_length, args.min_length, args.min_quality)
     
-    if args.submod == 'Porechop':
-        import porechop_wrap as submod
+    if args.submod == 'biobin':
+        import marker_binning as submod
             
     elif args.submod == 'Medaka':
-            
         import medaka_wrap as submod
     
     submod.run(reads, reference, outputDir, args)
@@ -42,11 +41,10 @@ def main():
     
         python bulkPlasmidSeq.py Medaka -i 'path/to/reads' -r 'path/to/plasmids' -o outputDirectory - t 2
     
-    For binning and alignment (Porechop):
+    For binning and alignment:
     
-        python bulkPlasmidSeq.py Porechop -i 'path/to/reads' -o outputDirectory -r 'path/to/plasmids.fasta'
-        
-        python bulkPlasmidSeq.py Porechop -i 'path/to/reads' -o outputDirectory -r 'path/to/plasmids' --end_size 500 -N 8        
+        python bulkPlasmidSeq.py biobin -i 'path/to/reads' -o outputDirectory -r 'path/to/plasmids.fasta'
+             
     '''
     #Modeling submodule picking after arq5x's poretools structure
     #Get args, picking of submodule runs in here
@@ -66,45 +64,51 @@ def getArgs():
 
     ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
     
-    #Porechop Args
-    porechopArgs = subparsers.add_parser('Porechop')
+    #biobin Args
+    biobinArgs = subparsers.add_parser('biobin')
     
-    generalArgsPorechop = porechopArgs.add_argument_group('General Arguments')
-    generalArgsPorechop.add_argument('-i', '--input_reads', required = True,
+    generalArgsbiobin = biobinArgs.add_argument_group('General Arguments')
+    generalArgsbiobin.add_argument('-i', '--input_reads', required = True,
                           help= 'input reads (directory to reads or .fastq)')
-    generalArgsPorechop.add_argument('-r', '--reference', required = True,
+    
+    generalArgsbiobin.add_argument('-r', '--reference', required = True,
                           help = 'plasmid sequences (directory or .fa)')
-    generalArgsPorechop.add_argument('-o', '--output_dir', required = True,
+    
+    generalArgsbiobin.add_argument('-o', '--output_dir', required = True,
                           help = 'output directory')
-    generalArgsPorechop.add_argument('-t', '--threads', required = False, default = 2,
+    
+    generalArgsbiobin.add_argument('-t', '--threads', required = False, default = 2,
                           help = 'number of threads, default 2')
-    generalArgsPorechop.add_argument('--filter', required = False, action='store_true',
+    
+    generalArgsbiobin.add_argument('--filter', required = False, action='store_true',
                        default = False, help = 'Filter reads before analysis')
-    generalArgsPorechop.add_argument('--double', required = False, action = 'store_true', default = False,
+    
+    generalArgsbiobin.add_argument('--double', required = False, action = 'store_true', default = False,
                           help = 'Double the reference genome, great for visualization, less for consensus generation')
     
-    porechop = porechopArgs.add_argument_group('Porechop Specific arguments')
-    porechop.add_argument('--barcode_threshold', required = False, default = 75)
-    porechop.add_argument('--end_size', required = False, default = 250)
-    porechop.add_argument('--rounds', '--porechop_iterations', required = False, default = 1,
-                              help = 'Number of rounds of Porechop binning')
+    biobin = biobinArgs.add_argument_group('biobin Specific arguments')
+    
+    biobin.add_argument('--marker_score', required = False, default = 95, help = 'Percent score for longest unique region')
+
     
     #IGV screenshot args Porchop
-    igvPorechop = porechopArgs.add_argument_group('IGV arguments for screenshotting')
-    igvPorechop.add_argument('--screenshot', required = False, action = 'store_true',
-                     help = 'Take screenshots of IGV for each plasmid')
-    igvPorechop.add_argument('--igv', required = False, default = None, help = 'Path to igv.sh')
+    igvbiobin = biobinArgs.add_argument_group('IGV arguments for screenshotting')
     
-    #NanoFilt args Porechop
-    nanofiltPorechop = porechopArgs.add_argument_group('Nanofilt arguments')
-    nanofiltPorechop.add_argument('--max_length', required = False, default = 100000,
+    igvbiobin.add_argument('--screenshot', required = False, action = 'store_true',
+                     help = 'Take screenshots of IGV for each plasmid')
+    
+    igvbiobin.add_argument('--igv', required = False, default = None, help = 'Path to igv.sh')
+    
+    #NanoFilt args biobin
+    nanofiltbiobin = biobinArgs.add_argument_group('Nanofilt arguments')
+    nanofiltbiobin.add_argument('--max_length', required = False, default = 1000000,
                                   help = 'Filtering reads by maximum length')
-    nanofiltPorechop.add_argument('--min_length', required = False, default = 0,
+    nanofiltbiobin.add_argument('--min_length', required = False, default = 0,
                                   help = 'Filtering reads by minimum length')
-    nanofiltPorechop.add_argument('-q', '--min_quality', required = False, default = 7,
+    nanofiltbiobin.add_argument('-q', '--min_quality', required = False, default = 7,
                                   help = 'Filter reads by quality score > N')
     
-    porechopArgs.set_defaults(func=pick_submodule)
+    biobinArgs.set_defaults(func=pick_submodule)
             
     ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
     
@@ -112,6 +116,7 @@ def getArgs():
     #Didn't make an argument group for that alone, add to general
     
     medakaArgs = subparsers.add_parser('Medaka')
+    
     generalArgsMedaka = medakaArgs.add_argument_group('General Arguments')
     generalArgsMedaka.add_argument('-i', '--input_reads', required=False,
                           help= 'input reads (directory to reads or .fastq)')
@@ -123,13 +128,13 @@ def getArgs():
                           help = 'number of threads, default 2')
     generalArgsMedaka.add_argument('--double', required = False, action = 'store_true', default = False,
                           help = 'Double the reference genome, great for visualization, less for consensus generation')
-    generalArgsMedaka.add_argument('-m', '--model', required = False, default = 'r941_min_high_g344',
+    generalArgsMedaka.add_argument('-m', '--model', required = False, default = 'r941_min_high_g360',
                           help = 'Medaka consensus model, Pore/Guppy version, use medaka tools list_models for list')
     
     generalArgsMedaka.add_argument('--filter', required = False, action='store_true',
                        default = False, help = 'Filter reads before analysis')
     
-    #IGV screenshot args Porchop
+    #IGV screenshot args
     igvMedaka = medakaArgs.add_argument_group('IGV arguments for screenshotting')
     igvMedaka.add_argument('--screenshot', required = False, action = 'store_true',
                      help = 'Take screenshots of IGV for each plasmid')
@@ -175,8 +180,6 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
         sys.exit('Input reads not found')
         
     elif os.path.isdir(inputFiles):
-        #print('Directory was given for input reads, concatenating these to output_reads.fastq \n')
-        
         try:
             subprocess.run(['cat %s/*.fastq > %s/input_reads.fastq' % (inputFiles, outputDir)],
                        check = True, shell = True)
@@ -199,7 +202,6 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
 
     elif os.path.isdir(referenceFiles):
         #print('Directory was given for plasmid reference, concatenating these to output_ref.fasta \n')
-        
         inRefFiles = os.listdir(referenceFiles)
         keep = []
         [keep.append(referenceFiles + keepFile) for keepFile in inRefFiles \
@@ -211,13 +213,6 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
             for f in keep:
                 with open(f, "rb") as infile:
                     outfile.write(infile.read())
-        
-        #try:
-            #subprocess.run(['cat %s/> %s/plasmid_genome_ref.fasta' %
-            #(referenceFiles, outputDir)], shell = True, check = True)
-            
-        #except subprocess.CalledProcessError:
-            #sys.exit('Could not find reference plasmid sequences')
             
         reference = '%s/plasmid_genome_ref.fasta' % outputDir
 
