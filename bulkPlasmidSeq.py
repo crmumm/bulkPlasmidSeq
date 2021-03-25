@@ -15,7 +15,7 @@ def pick_submodule(args):
     if None not in (args.input_reads, args.reference, args.output_dir):
     
         reads, reference, outputDir = loadReads(args.input_reads, args.reference, args.output_dir, args.double)
-    
+        
     else:
         sys.exit('Missing one of the following arguments, --input(-i), --reference(-r), --output_dir(-o)')
         
@@ -24,7 +24,7 @@ def pick_submodule(args):
         reads = filterReads(reads, outputDir, args.max_length, args.min_length, args.min_quality)
     
     if args.submod == 'biobin':
-        import marker_binning as submod
+        import biobinning as submod
             
     elif args.submod == 'Medaka':
         import medaka_wrap as submod
@@ -83,13 +83,22 @@ def getArgs():
     generalArgsbiobin.add_argument('--filter', required = False, action='store_true',
                        default = False, help = 'Filter reads before analysis')
     
+    generalArgsbiobin.add_argument('-m', '--model', required = False, default = 'r941_min_high_g360',
+                          help = 'Medaka consensus model, Pore/Guppy version, use medaka tools list_models for list')
+    
     generalArgsbiobin.add_argument('--double', required = False, action = 'store_true', default = False,
                           help = 'Double the reference genome, great for visualization, less for consensus generation')
     
     biobin = biobinArgs.add_argument_group('biobin Specific arguments')
     
     biobin.add_argument('--marker_score', required = False, default = 95, help = 'Percent score for longest unique region')
-
+    
+    biobin.add_argument('-k', '--kmer_length', required = False, default = 12)
+    
+    biobin.add_argument('--match', required = False, default = 3)
+    biobin.add_argument('--mismatch', required = False, default = -6)
+    biobin.add_argument('--gap_open', required = False, default = -10)
+    biobin.add_argument('--gap_extend', required = False, default = -5)
     
     #IGV screenshot args Porchop
     igvbiobin = biobinArgs.add_argument_group('IGV arguments for screenshotting')
@@ -206,8 +215,6 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
         keep = []
         [keep.append(referenceFiles + keepFile) for keepFile in inRefFiles \
          if keepFile.endswith('.fa') or keepFile.endswith('.fasta')]
-        
-        print(keep)
         
         with open('%s/plasmid_genome_ref.fasta' % outputDir, 'wb') as outfile:
             for f in keep:

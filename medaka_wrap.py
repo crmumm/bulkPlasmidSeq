@@ -26,12 +26,17 @@ def runMedaka(reads, reference, outputDir, threads, model, screenshot, igv):
     Please see Dependencies.txt or https://github.com/nanoporetech/medaka for more information about installing medaka.
     Only medaka_consensus used in this pipeline.
     '''
-    
     print('----------------------------------\n')
     print('Running Medaka with the following arguments, more info in medaka_log.txt')
     print('----------------------------------\n')
     print('Input files: %s \nReference Files: %s \nOutput directory: %s \nThreads: %s \nModel: %s\n'
          % (reads, reference, outputDir, str(threads), model))
+    
+    if os.path.isfile(outputDir):
+        sys.exit('Ouput directory exists')
+    
+    elif not os.path.exists(outputDir):
+        subprocess.run(['mkdir %s' % outputDir], shell = True)
     
     with open('%s/medaka_log.txt' % outputDir, 'wt') as log:
         # Quietly run medaka, make a medaka_log
