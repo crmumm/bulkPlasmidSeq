@@ -60,15 +60,15 @@ def processMedakaOutput(outputDir, reference, screenshot, igv = None):
         consensusFasta = open(filePath, 'rt')
         for line in consensusFasta:
             if line.startswith('>'):
-                header = line.split(' ')[0]  
+                header = line.split(' ')[0]
             else:
                 seq = line
                 out = open('%s/consensus_sequences/%s.fasta' % (outputDir, header[1:]), 'wt')
-                out.write('%s \n%s' % (header, seq))
+                out.write('%s %s' % (header.strip(), seq))
     
-    subprocess.run(['samtools view -bq 1 %s/calls_to_draft.bam > %s/final_processed.bam' %
-                    (outputDir, outputDir)], shell = True)
-    subprocess.run(['samtools index %s/final_processed.bam' % outputDir], shell = True)
+    #subprocess.run(['samtools view -bq 1 %s/calls_to_draft.bam > %s/final_processed.bam' %
+    #                (outputDir, outputDir)], shell = True)
+    #subprocess.run(['samtools index %s/final_processed.bam' % outputDir], shell = True)
     
                 
     #Run take screenshots based on final_processed.bam    
