@@ -153,11 +153,15 @@ def run_medaka_binned(fastq_reads, reference, k, output_directory, args,
                              match = 3, mismatch = -6, gap_open = -10, gap_extend = -5)
     
     with open(reference) as ref_list:
-        for record, plasmid_bin in zip(SeqIO.parse(ref_list, 'fasta'), output_bins):
-            #for plasmid_bin in output_bins:
-            single_reference = SeqIO.write(record, '%s.fasta' % plasmid_bin, 'fasta')
-            medaka_wrap.runMedaka(plasmid_bin + '.fastq', '%s.fasta'% plasmid_bin,
-                                  plasmid_bin+'_consensus',
-                                  args.threads,
-                                  args.model, args.screenshot, args.igv)
+        #for record, plasmid_bin in zip(SeqIO.parse(ref_list, 'fasta'), output_bins):
+        for record in SeqIO.parse(ref_list, 'fasta'):
+            for plasmid_bin in output_bins:
+                plasmid_name = plasmid_bin.split('/')[-1]
+                if plasmid_name == record.name:
+                    #for plasmid_bin in output_bins:
+                    single_reference = SeqIO.write(record, '%s.fasta' % plasmid_bin, 'fasta')
+                    medaka_wrap.runMedaka(plasmid_bin + '.fastq', '%s.fasta'% plasmid_bin,
+                                      plasmid_bin+'_consensus',
+                                      args.threads,
+                                      args.model, args.screenshot, args.igv)
                                        
