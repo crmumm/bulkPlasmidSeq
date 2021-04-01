@@ -73,66 +73,75 @@ def define_markers(file, k):
     kmers = unique_kmers(file, k)
     seqs = getFasta(file)
     intervals = defaultdict(list)
+    #print('Found %d plasmids' % len(unique_kmers))
     for plasmid in kmers:
-        print('New plasmid')
-        print(kmers[plasmid])
         save_start = kmers[plasmid][0][1]
-        print('Start: ' + str(save_start))
         save_end = kmers[plasmid][-1][1]
-        print('End: '+ str(save_end))
         moving = save_start
         for i in range(len(kmers[plasmid])):
-            print('Len = ' + str(len(kmers[plasmid])))
-            print('Kmer index ' + str(kmers[plasmid][i][1]))
             if moving == kmers[plasmid][i][1]:
-                print(moving)
                 moving +=1
                 if moving == save_end:
-                    print("At end interval")
                     intervals[plasmid].append((save_start, moving))
             else:
-                print('In else')
-                print(moving)
                 intervals[plasmid].append((save_start, moving))
-                print(intervals)
-                save_start = kmers[plasmid][i+1][1]
-                moving = kmers[plasmid][i+1][1]
+                moving = kmers[plasmid][i][1]
 
     #Get some maker definitions
     best_markers = defaultdict(list)
     for x in intervals:
         #Keep the longest unique interval 
-        #Format = {'plasmid_name': [(start, end), len, seq]}
-        best_markers[x]= [(0, 1), 1]
+        #Format = {'plasmid_name': [(start, end), len, unique_seq, context_seq]}
+        best_markers[x]= [(0, 1), 1, 'None', 'None']
         for y in intervals[x]:
             length_marker = y[1]-y[0]
             #Calculate unique length based on k
             #Len + 1 = k + uniq - 1
             uniq_length = length_marker + 2 - k
-            #print(best_markers[x][1])
             if uniq_length > best_markers[x][1]:
-                marker_start = round(y[0] + k*0.5)
-                marker_end = round(y[1]+k*0.5)
+                marker_start = round(y[0]+k-2)
+                marker_end = round(y[1])
                 marker_seq = seqs[x][marker_start:marker_end]
-                best_markers[x] = [(marker_start, marker_end), uniq_length, marker_seq]
-    print(best_markers)                         
+                if marker_start-10 < 0 or marker_end+10 > len(seqs[x]):
+                    print('End of plasmid')
+                else:
+                    context_seq = seqs[x][marker_start-10:marker_end+10]
+                
+                best_markers[x] = [(marker_start, marker_end), uniq_length, marker_seq, context_seq]
+                    
     return best_markers
 
-def align_reads(fastq_reads, reference, k, match = 3, mismatch = -6, gap_open = -10, gap_extend = -5):
+def align_reads(fastq_reads, fasta_ref, k):
+    context_count = 0
+    fine_count = 0 
     # Reads binned by BC
     reads_dict = defaultdict(list)
-    aligner = define_aligner(match, mismatch, gap_open, gap_extend)
-    markers = define_markers(reference, k)
+    markers = define_markers(fasta_ref, k)
     #record_dict = SeqIO.index(read_libray, 'fastq')
     for record in SeqIO.parse(fastq_reads, 'fastq'):
         for plasmid in markers:
-            fwd_marker = markers[plasmid][2]
-            best_score = aligner.score(fwd_marker, fwd_marker)
-            top_score = max(aligner.score(record.seq, fwd_marker), aligner.score(record.seq, reverse_complement(fwd_marker)))
-            ##print(top_score)
-            if top_score >= best_score*0.95:
-                reads_dict[plasmid].append(record)
-                          
+            context_fwd_marker = markers[plasmid][3]
+            #Match with context
+            best_score = aligner.score(context_fwd_marker, context_fwd_marker)
+            scores = [aligner.score(record.seq, context_fwd_marker),
+                     aligner.score(record.seq, reverse_complement(context_fwd_marker))]
+            top_score = (max(scores), scores.index(max(scores)))
+            if top_score[0] >= best_score*0.75:
+                context_count += 1
+                #Fine match
+                #Overwrite best score with fine marker
+                best_score = aligner.score(markers[plasmid][2], markers[plasmid][2])
+                if top_score[1] == 0:
+                    #Use Forward
+                    if aligner.score(record.seq, markers[plasmid][2]) >= best_score*0.95:
+                        fine_count += 1
+                        reads_dict[plasmid].append(record)
+                else:
+                    fine_count += 1
+                    if aligner.score(record.seq, reverse_complement(markers[plasmid][2])) > best_score*0.95:
+                        reads_dict[plasmid].append(record)
+    #print(context_count)
+    #print(fine_count)
     return reads_dict
 
 def write_bins(fastq_reads, reference, k, output_directory, match = 3, mismatch = -6, gap_open = -10, gap_extend = -5):
