@@ -111,37 +111,41 @@ def define_markers(file, k):
                     
     return best_markers
 
-def align_reads(fastq_reads, fasta_ref, k):
-    context_count = 0
-    fine_count = 0 
-    # Reads binned by BC
+def align_reads(fastq_reads, fasta_ref, k, context_score, fine_alignment_score):
     reads_dict = defaultdict(list)
+    #Get the context and unique sequence from define makers
     markers = define_markers(fasta_ref, k)
-    #record_dict = SeqIO.index(read_libray, 'fastq')
-    for record in SeqIO.parse(fastq_reads, 'fastq'):
-        for plasmid in markers:
-            context_fwd_marker = markers[plasmid][3]
-            #Match with context
-            best_score = aligner.score(context_fwd_marker, context_fwd_marker)
+    for plasmid in markers:
+        context_fwd_marker = markers[plasmid][3]
+        context_rev_marker = reverse_complement(context_fwd_marker)
+        #Match with context
+        best_score = aligner.score(context_fwd_marker, context_fwd_marker)
+        #Iterate through each plasmid, then each read
+        for record in SeqIO.parse(fastq_reads, 'fastq'):
+            #Determines if forward or backward is better without doing alignment
             scores = [aligner.score(record.seq, context_fwd_marker),
-                     aligner.score(record.seq, reverse_complement(context_fwd_marker))]
+                     aligner.score(record.seq, context_rev_marker)]
             top_score = (max(scores), scores.index(max(scores)))
-            if top_score[0] >= best_score*0.75:
-                context_count += 1
-                #Fine match
-                #Overwrite best score with fine marker
-                best_score = aligner.score(markers[plasmid][2], markers[plasmid][2])
+            if top_score[0] >= context_score*best_score:
+                #Define top possible score for unique vs unique
+                best_fine_score = aligner.score(markers[plasmid][2], markers[plasmid][2])
+                #If the forward marker had the best score
                 if top_score[1] == 0:
-                    #Use Forward
-                    if aligner.score(record.seq, markers[plasmid][2]) >= best_score*0.95:
-                        fine_count += 1
+                    top_fwd_alignment = sorted(aligner.align(record.seq, context_fwd_marker))[0]
+                    #Get the sequence that the aligned to the larger region
+                    subseq = record.seq[top_fwd_alignment.aligned[0][0][0]:top_fwd_alignment.aligned[0][-1][-1]]
+                    #Possible add length subseq check
+                    if aligner.score(subseq, markers[plasmid][2]) >= fine_alignment_score*best_fine_score:
                         reads_dict[plasmid].append(record)
-                else:
-                    fine_count += 1
-                    if aligner.score(record.seq, reverse_complement(markers[plasmid][2])) > best_score*0.95:
+                        
+                #If the reverse marker has the best score
+                if top_score[1] == 1:
+                    #Get the sequence that the aligned to the larger region
+                    top_rev_alignment = sorted(aligner.align(record.seq, context_fwd_marker))[0]
+                    subseq = record.seq[top_rev_alignment.aligned[0][0][0]:top_rev_alignment.aligned[0][-1][-1]]
+                    if aligner.score(subseq, reverse_complement(markers[plasmid][2])) >= fine_alignment_score*best_fine_score:
                         reads_dict[plasmid].append(record)
-    #print(context_count)
-    #print(fine_count)
+                
     return reads_dict
 
 def write_bins(fastq_reads, reference, k, output_directory, match = 3, mismatch = -6, gap_open = -10, gap_extend = -5):
