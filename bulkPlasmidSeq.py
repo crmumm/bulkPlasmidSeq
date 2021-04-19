@@ -99,6 +99,8 @@ def getArgs():
     biobin.add_argument('--mismatch', required = False, default = -6)
     biobin.add_argument('--gap_open', required = False, default = -10)
     biobin.add_argument('--gap_extend', required = False, default = -5)
+    biobin.add_argument('--context_map', required = False, default = 0.80)
+    biobin.add_argument('--fine_map', required = False, default = 0.95)
     
     #IGV screenshot args Porchop
     igvbiobin = biobinArgs.add_argument_group('IGV arguments for screenshotting')
@@ -292,12 +294,21 @@ def takeScreenshots(reference, outputDir, igv):
     for plasmid in plasmidList:
         #Sleeping between commands as a workaround of IGV bug
         stringForIGV += 'goto %s\nsnapshot\nsetSleepInterval 10\n' % (plasmid)
+        
+    head, tail = os.path.split(outputDir)
+    output_abs = os.path.dirname(os.path.abspath(outputDir))
+    output_absolute_dir = os.path.join(output_abs, tail)
     
-    igvBatch = open('%s/igv_screenshot.bat'% outputDir, 'wt')
+    igvBatch = open('%s/igv_screenshot.bat'% output_absolute_dir, 'wt')
+    print('************************************************')
+    head, tail = os.path.split(reference)
+    reference_abs = os.path.dirname(os.path.abspath(reference))
+    reference_dir = os.path.join(reference_abs, tail)
     
     #IGV is picky about formatting, watch spaces
     template = 'new\nsnapshotDirectory %s\ngenome %s\nload %s\nmaxPanelHeight 400' \
-    '\n%sexit'% (outputDir + '/screenshots', reference, outputDir + '/final_processed.bam', stringForIGV)
+    '\n%sexit'% (output_absolute_dir + '/screenshots', reference_dir,
+                 output_absolute_dir + '/calls_to_draft.bam', stringForIGV)
     
     igvBatch.write(template)
     igvBatch.close()
@@ -306,9 +317,8 @@ def takeScreenshots(reference, outputDir, igv):
         sys.exit('\n Taking screenshots needs path to igv.sh \n')
         
     #Run igv.sh -b batchfile.bat
-    #Quiet the java stdout 
-    
-    subprocess.run(['%s' % igv, ' -b',  ' %s' % (outputDir+ '/igv_screenshot.bat')])
+    #Quiet the java stdout
+    subprocess.run(['%s -b %s' % (igv, output_absolute_dir+ '/igv_screenshot.bat')], shell = True)
                             
     
 def getFasta(file):
