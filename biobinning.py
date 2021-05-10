@@ -1,7 +1,7 @@
 from Bio import Align,SeqIO
 from collections import defaultdict, Counter
 import sys
-#import matplotlib.pyplot as plt
+from operator import itemgetter
 import medaka_wrap
 import bulkPlasmidSeq
 
@@ -81,76 +81,97 @@ def define_markers(file, k):
         save_end = kmers[plasmid][-1][1]
         moving = save_start
         for i in range(len(kmers[plasmid])):
+            #print(save_start, moving, save_end, kmers[plasmid][i][1])
             if moving == kmers[plasmid][i][1]:
                 moving +=1
                 if moving == save_end:
                     intervals[plasmid].append((save_start, moving))
             else:
                 intervals[plasmid].append((save_start, moving))
-                moving = kmers[plasmid][i][1]
-
+                moving = kmers[plasmid][i+1][1]
+                save_start = moving
+                            
     #Get some maker definitions
     best_markers = defaultdict(list)
+    
     for x in intervals:
+        
         #Keep the longest unique interval 
         #Format = {'plasmid_name': [(start, end), len, unique_seq, context_seq]}
-        best_markers[x]= [(0, 1), 1, 'None', 'None']
+        #best_markers[x]= [(0, 1), 1, 'None', 'None']
         for y in intervals[x]:
             length_marker = y[1]-y[0]
             #Calculate unique length based on k
             #Len + 1 = k + uniq - 1
             uniq_length = length_marker + 2 - k
-            if uniq_length > best_markers[x][1]:
+            if uniq_length >= 4: #best_markers[x][1]:
                 marker_start = round(y[0]+k-2)
                 marker_end = round(y[1])
                 marker_seq = seqs[x][marker_start:marker_end]
                 if marker_start-10 < 0 or marker_end+10 > len(seqs[x]):
-                    print('End of plasmid')
+                    print('Limited context available, markers near end of provided reference')
                 else:
                     context_seq = seqs[x][marker_start-10:marker_end+10]
                 
-                best_markers[x] = [(marker_start, marker_end), uniq_length, marker_seq, context_seq]
-                    
+                best_markers[x].append([(marker_start, marker_end), uniq_length, marker_seq, context_seq])
+                
+    #print(best_markers)
+    for item in best_markers:
+        unsorted_markers_list = best_markers[item]
+        length_sorted_markers = sorted(unsorted_markers_list, key = itemgetter(2))
+        if len(length_sorted_markers) >=3:
+            best_markers[item].append(length_sorted_markers[:2])
+        
+        else:
+            best_markers[item] = length_sorted_markers
+
+    print(best_markers)
     return best_markers
 
 def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_extend, context_score, fine_alignment_score):
     reads_dict = defaultdict(list)
     aligner = define_aligner(match, mismatch, gap_open, gap_extend)
+    
     #Get the context and unique sequence from define makers
-    markers = define_markers(fasta_ref, k)
-    for plasmid in markers:
-        context_fwd_marker = markers[plasmid][3]
-        context_rev_marker = reverse_complement(context_fwd_marker)
-        #Match with context
-        best_score = aligner.score(context_fwd_marker, context_fwd_marker)
+    markers_dict = define_markers(fasta_ref, k)
+    
+    for plasmid in markers_dict:
         
-        #Iterate through each plasmid, then each read
-        for record in SeqIO.parse(fastq_reads, 'fastq'):
-            #Determines if forward or backward is better without doing alignment
-            scores = [aligner.score(record.seq, context_fwd_marker),
-                     aligner.score(record.seq, context_rev_marker)]
-            top_score = (max(scores), scores.index(max(scores)))
+        for marker_region in markers_dict[plasmid]:
             
-            if top_score[0] >= context_score*best_score:
-                #Define top possible score for unique vs unique
-                best_fine_score = aligner.score(markers[plasmid][2], markers[plasmid][2])
-                
-                #If the forward marker had the best score
-                if top_score[1] == 0:
-                    top_fwd_alignment = sorted(aligner.align(record.seq, context_fwd_marker))[0]
-                    #Get the sequence that the aligned to the larger region
-                    subseq = record.seq[top_fwd_alignment.aligned[0][0][0]:top_fwd_alignment.aligned[0][-1][-1]]
-                    #Possible add length subseq check
-                    if aligner.score(subseq, markers[plasmid][2]) >= fine_alignment_score*best_fine_score:
-                        reads_dict[plasmid].append(record)
-                        
-                #If the reverse marker has the best score
-                if top_score[1] == 1:
-                    #Get the sequence that the aligned to the larger region
-                    top_rev_alignment = sorted(aligner.align(record.seq, context_fwd_marker))[0]
-                    subseq = record.seq[top_rev_alignment.aligned[0][0][0]:top_rev_alignment.aligned[0][-1][-1]]
-                    if aligner.score(subseq, reverse_complement(markers[plasmid][2])) >= fine_alignment_score*best_fine_score:
-                        reads_dict[plasmid].append(record)
+            context_fwd_marker = marker_region[3]
+            context_rev_marker = reverse_complement(context_fwd_marker)
+            #Match with context
+            best_score = aligner.score(context_fwd_marker, context_fwd_marker)
+
+            #Iterate through each plasmid, then each read
+            for record in SeqIO.parse(fastq_reads, 'fastq'):
+                #Determines if forward or backward is better without doing alignment
+                scores = [aligner.score(record.seq, context_fwd_marker),
+                         aligner.score(record.seq, context_rev_marker)]
+                top_score = (max(scores), scores.index(max(scores)))
+
+                if top_score[0] >= float(context_score)*best_score:
+                    #Define top possible score for unique vs unique
+                    best_fine_score = aligner.score(marker_region[2], marker_region[2])
+
+                    #If the forward marker had the best score
+                    if top_score[1] == 0:
+                        top_fwd_alignment = sorted(aligner.align(record.seq, context_fwd_marker))[0]
+                        #Get the sequence that the aligned to the larger region
+                        subseq = record.seq[top_fwd_alignment.aligned[0][0][0]:top_fwd_alignment.aligned[0][-1][-1]]
+                        #Possible add length subseq check
+                        if aligner.score(subseq, marker_region[2]) >= float(fine_alignment_score)*best_fine_score:
+                            reads_dict[plasmid].append(record)
+
+                    #If the reverse marker has the best score
+                    if top_score[1] == 1:
+                        #Get the sequence that the aligned to the larger region
+                        top_rev_alignment = sorted(aligner.align(record.seq, context_fwd_marker))[0]
+                        subseq = record.seq[top_rev_alignment.aligned[0][0][0]:top_rev_alignment.aligned[0][-1][-1]]
+                        if aligner.score(subseq,
+                                         reverse_complement(marker_region[2])) >= float(fine_alignment_score)*best_fine_score:
+                            reads_dict[plasmid].append(record)
                 
     return reads_dict
 

@@ -166,7 +166,11 @@ def getArgs():
     ###***###***###***###***###***###***###***###***###***###***###***###***###***###***###***
 
     args = ap.parse_args()
-    args.func(args)
+    try:
+        func = args.func
+    except AttributeError:
+        ap.error("No arguments provided. Add -h for help")
+    func(args)
 
     if args.screenshot is True and args.igv is None:
         sys.exit('Please specify a path to igv.sh for taking screenshots')
