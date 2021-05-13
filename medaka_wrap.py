@@ -64,10 +64,14 @@ def processMedakaOutput(outputDir, reference, screenshot, igv = None):
         
         for record_reference in SeqIO.parse(consensusFile, 'fasta'):
             for record_consensus in SeqIO.parse(reference, 'fasta'):
-                if record_con.name == record_ref.name: #Match the consensus to the reference
+                #medaka appends contig number and positions to the fasta name/strip these off to match to original reference name
+                base_ref_name = record_reference.name.split(' ')[0][:-2]
+                print(base_ref_name)
+                if base_ref_name in record_consensus.name: #Match the consensus to the reference
+                    print('Match')
                     SeqIO.write(record_consensus, destination + record_consensus.name+'_consensus.fasta', 'fasta')
-                    SeqIO.write(record_reference, outputDir + record_reference.name+'_reference.fasta', 'fasta')
-                    needle_commands.append(NeedleCommandline(asequence = outputDir + record_reference.name+'_reference.fasta',
+                    SeqIO.write(record_reference, outputDir + "/" + record_reference.name+'_reference.fasta', 'fasta')
+                    needle_commands.append(NeedleCommandline(asequence = outputDir + "/" + record_reference.name+'_reference.fasta',
                                                          bsequence = destination + record_consensus.name+'_consensus.fasta',
                                                          gapopen = 10,
                                                          gapextend = 0.5,
@@ -80,6 +84,5 @@ def processMedakaOutput(outputDir, reference, screenshot, igv = None):
     if screenshot:
         bulkPlasmidSeq.takeScreenshots(reference, outputDir, igv)
         
-def produce_alignments(output_dir);
-
+        
     return
