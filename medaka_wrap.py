@@ -40,7 +40,7 @@ def runMedaka(reads, reference, outputDir, threads, model, screenshot, igv):
     
     with open('%s/medaka_log.txt' % outputDir, 'wt') as log:
         # Quietly run medaka, make a medaka_log
-        subprocess.run(['medaka_consensus', '-i', str(reads), '-d', str(reference),
+        subprocess.run(['medaka_consensus', '-g', '-i', str(reads), '-d', str(reference),
                         '-o', str(outputDir), '-t', str(threads), '-m', str(model)],
                        stdout = log, stderr = log, check = True)
     

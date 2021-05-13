@@ -125,7 +125,6 @@ def define_markers(file, k):
         else:
             best_markers[item] = length_sorted_markers
 
-    print(best_markers)
     return best_markers
 
 def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_extend, context_score, fine_alignment_score):
