@@ -8,20 +8,30 @@ import bulkPlasmidSeq
 def run(fastq_reads, reference, output_directory, args):
     
     k = int(args.kmer_length)
-    
     run_medaka_binned(fastq_reads, reference, k, output_directory, args,
-                      args.match, args.mismatch, args.gap_open, args.gap_extend, args.context_map, args.fine_map)
+                      args.match, args.mismatch, args.gap_open, args.gap_extend,
+                      args.context_map, args.fine_map, int(args.max_regions))
     
     return
 
-def define_aligner(match, mismatch, open_gap, extend):
-    #Nanopore read Scoring
+def define_aligner(match = 3, mismatch = -6, open_gap = -10, extend = -5):
+    '''
+    Nanopore read scoring default
+     - match = 3
+     - mismatch = -6
+     - open_gap = -10
+     - extend_gap = -5
+    
+    Returns Biopython PairwiseAligner
+     - mode = local
+    '''
+    
     aligner = Align.PairwiseAligner()
     aligner.mode = 'local'
-    aligner.match_score = 3
-    aligner.mismatch_score = -6
-    aligner.open_gap_score = -10
-    aligner.extend_gap_score = -5
+    aligner.match_score = match 
+    aligner.mismatch_score = mismatch
+    aligner.open_gap_score = open_gap
+    aligner.extend_gap_score = extend
     
     return aligner
 
@@ -55,6 +65,12 @@ def reverse_complement(seq):
     return seq.translate(mapping)[::-1]
 
 def build_kmers(file, k):
+    '''
+    Called by unique_kmers. 
+    
+    Returns dictionary of all kmers in plasmids.
+    
+    '''
     seqs = getFasta(file)
     plasmids = defaultdict(list)
     for x in seqs:
@@ -62,6 +78,12 @@ def build_kmers(file, k):
     return plasmids
 
 def unique_kmers(file, k):
+    '''
+    Called by define markers, calls build_kmers. 
+    
+    Returns a default dict of unique kmers
+    '''
+    
     plasmids = build_kmers(file, k)
     unique_kmers = defaultdict(list)
     for x in plasmids:
@@ -71,7 +93,23 @@ def unique_kmers(file, k):
                 unique_kmers[x].append(marker)
     return unique_kmers
 
-def define_markers(file, k):
+def define_markers(file, k, max_regions):
+    '''
+    Called by align_reads. Calls unique_kmers to return all the unique regions for plasmids.
+    Processes the unique regions to get the start, end, length, sequence, and context sequence for the 
+    regions to align to. These region are then sorted by length and the top [max_regions] are selected.
+    
+    If the regions are long enough (> ~50bp) would be better to use medaka to distinguish plasmids.
+    Due to high identity scores required for binning, longer regions return fewer reads.
+         - Lower score context and fine map score 
+         - Use medaka
+    
+    Number reads * max_regions 
+    
+    Returns default dict (list) of best [max_regions, default 3] regions.
+    Format {'plasmid_name': [(start, end), len, unique_seq, context_seq]}
+    
+    '''
     kmers = unique_kmers(file, k)
     seqs = getFasta(file)
     intervals = defaultdict(list)
@@ -119,7 +157,7 @@ def define_markers(file, k):
     for item in best_markers:
         unsorted_markers_list = best_markers[item]
         length_sorted_markers = sorted(unsorted_markers_list, key = itemgetter(2))
-        if len(length_sorted_markers) >=3:
+        if len(length_sorted_markers) >= max_regions:
             best_markers[item].append(length_sorted_markers[:2])
         
         else:
@@ -127,12 +165,19 @@ def define_markers(file, k):
 
     return best_markers
 
-def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_extend, context_score, fine_alignment_score):
+def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_extend,
+                context_score, fine_alignment_score, max_regions):
+    '''
+    Called by write bins. Calls the define_aligner and define_markers. Gets the regions to score across and 
+    uses those for Biopython PairwiseAligner() alignment to all of the provided reads.
+    
+    Returns dictionary with plasmids (references) as keys and reads as values:
+    '''
     reads_dict = defaultdict(list)
     aligner = define_aligner(match, mismatch, gap_open, gap_extend)
     
     #Get the context and unique sequence from define makers
-    markers_dict = define_markers(fasta_ref, k)
+    markers_dict = define_markers(fasta_ref, k, max_regions)
     
     for plasmid in markers_dict:
         
@@ -175,9 +220,10 @@ def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_exten
     return reads_dict
 
 def write_bins(fastq_reads, reference, k, output_directory, match = 3,
-               mismatch = -6, gap_open = -10, gap_extend = -5, context_map = 0.80, fine_map = 0.95):
+               mismatch = -6, gap_open = -10, gap_extend = -5,
+               context_map = 0.80, fine_map = 0.95, max_regions = 3):
     
-    reads_dict = align_reads(fastq_reads, reference, k,  match, mismatch, gap_open, gap_extend, context_map, fine_map)
+    reads_dict = align_reads(fastq_reads, reference, k,  match, mismatch, gap_open, gap_extend, context_map, fine_map, max_regions)
     output_directory = output_directory.strip('/')
     output_bins = []
     for plasmid in reads_dict:
@@ -187,10 +233,11 @@ def write_bins(fastq_reads, reference, k, output_directory, match = 3,
     return output_bins
 
 def run_medaka_binned(fastq_reads, reference, k, output_directory, args,
-                      match = 3, mismatch = -6, gap_open = -10, gap_extend = -5, context_map = 0.80, fine_map = 0.95):
+                      match = 3, mismatch = -6, gap_open = -10, gap_extend = -5,
+                      context_map = 0.80, fine_map = 0.95, max_regions = 3):
     
     output_bins = write_bins(fastq_reads, reference, k, output_directory, match, mismatch, gap_open, gap_extend,
-                            context_map, fine_map)
+                            context_map, fine_map, max_regions)
     
     with open(reference) as ref_list:
         #for record, plasmid_bin in zip(SeqIO.parse(ref_list, 'fasta'), output_bins):

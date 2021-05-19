@@ -101,6 +101,7 @@ def getArgs():
     biobin.add_argument('--gap_extend', required = False, default = -5)
     biobin.add_argument('--context_map', required = False, default = 0.80)
     biobin.add_argument('--fine_map', required = False, default = 0.95)
+    biobin.add_argument('--max_regions', required = False, default = 3, help = 'Maximum number of regions to align/score')
     
     #IGV screenshot args Porchop
     igvbiobin = biobinArgs.add_argument_group('IGV arguments for screenshotting')
