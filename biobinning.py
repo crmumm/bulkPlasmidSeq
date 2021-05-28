@@ -16,7 +16,7 @@ def run(fastq_reads, reference, output_directory, args):
 
 def define_aligner(match = 3, mismatch = -6, open_gap = -10, extend = -5):
     '''
-    Nanopore read scoring default
+    Nanopore read scoring
      - match = 3
      - mismatch = -6
      - open_gap = -10
@@ -73,6 +73,7 @@ def build_kmers(file, k):
     '''
     seqs = getFasta(file)
     plasmids = defaultdict(list)
+        
     for x in seqs:
         plasmids[x] = [(seqs[x][i : i + k],i) for i in range(0, len(seqs[x]) - k + 1)]
     return plasmids
@@ -91,6 +92,7 @@ def unique_kmers(file, k):
         for marker in plasmids[x]:
             if marker[0] not in op and reverse_complement(marker[0]) not in op:
                 unique_kmers[x].append(marker)
+                
     return unique_kmers
 
 def define_markers(file, k, max_regions):
@@ -133,7 +135,6 @@ def define_markers(file, k, max_regions):
     best_markers = defaultdict(list)
     
     for x in intervals:
-        
         #Keep the longest unique interval 
         #Format = {'plasmid_name': [(start, end), len, unique_seq, context_seq]}
         #best_markers[x]= [(0, 1), 1, 'None', 'None']
@@ -141,8 +142,8 @@ def define_markers(file, k, max_regions):
             length_marker = y[1]-y[0]
             #Calculate unique length based on k
             #Len + 1 = k + uniq - 1
-            uniq_length = length_marker + 2 - k
-            if uniq_length >= 4: #best_markers[x][1]:
+            uniq_length = length_marker - k + 2
+            if uniq_length >= 3:
                 marker_start = round(y[0]+k-2)
                 marker_end = round(y[1])
                 marker_seq = seqs[x][marker_start:marker_end]
@@ -152,17 +153,17 @@ def define_markers(file, k, max_regions):
                     context_seq = seqs[x][marker_start-10:marker_end+10]
                 
                 best_markers[x].append([(marker_start, marker_end), uniq_length, marker_seq, context_seq])
-                
-    #print(best_markers)
+    
     for item in best_markers:
         unsorted_markers_list = best_markers[item]
         length_sorted_markers = sorted(unsorted_markers_list, key = itemgetter(2))
+        
         if len(length_sorted_markers) >= max_regions:
-            best_markers[item].append(length_sorted_markers[:2])
+            best_markers[item] = length_sorted_markers[:max_regions]
         
         else:
             best_markers[item] = length_sorted_markers
-
+            
     return best_markers
 
 def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_extend,
@@ -171,7 +172,9 @@ def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_exten
     Called by write bins. Calls the define_aligner and define_markers. Gets the regions to score across and 
     uses those for Biopython PairwiseAligner() alignment to all of the provided reads.
     
-    Returns dictionary with plasmids (references) as keys and reads as values:
+    Returns dictionary with plasmids (references) as keys and reads as values
+    
+    If there is only one plasmid, (or if the length of unique sequence is too long), return None to run medaka.
     '''
     reads_dict = defaultdict(list)
     aligner = define_aligner(match, mismatch, gap_open, gap_extend)
@@ -179,20 +182,24 @@ def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_exten
     #Get the context and unique sequence from define makers
     markers_dict = define_markers(fasta_ref, k, max_regions)
     
+    #Leave the biobin steps here if there is only 1 plasmid
+    if len(markers_dict) == 1:
+        print('Single plasmid found, passing all reads and reference to medaka')
+        return None
+    
     for plasmid in markers_dict:
-        
         for marker_region in markers_dict[plasmid]:
-            
             context_fwd_marker = marker_region[3]
             context_rev_marker = reverse_complement(context_fwd_marker)
             #Match with context
+        
             best_score = aligner.score(context_fwd_marker, context_fwd_marker)
-
             #Iterate through each plasmid, then each read
             for record in SeqIO.parse(fastq_reads, 'fastq'):
                 #Determines if forward or backward is better without doing alignment
                 scores = [aligner.score(record.seq, context_fwd_marker),
                          aligner.score(record.seq, context_rev_marker)]
+                
                 top_score = (max(scores), scores.index(max(scores)))
 
                 if top_score[0] >= float(context_score)*best_score:
@@ -213,8 +220,7 @@ def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_exten
                         #Get the sequence that the aligned to the larger region
                         top_rev_alignment = sorted(aligner.align(record.seq, context_fwd_marker))[0]
                         subseq = record.seq[top_rev_alignment.aligned[0][0][0]:top_rev_alignment.aligned[0][-1][-1]]
-                        if aligner.score(subseq,
-                                         reverse_complement(marker_region[2])) >= float(fine_alignment_score)*best_fine_score:
+                        if aligner.score(subseq, reverse_complement(marker_region[2])) >= float(fine_alignment_score)*best_fine_score:
                             reads_dict[plasmid].append(record)
                 
     return reads_dict
@@ -224,6 +230,10 @@ def write_bins(fastq_reads, reference, k, output_directory, match = 3,
                context_map = 0.80, fine_map = 0.95, max_regions = 3):
     
     reads_dict = align_reads(fastq_reads, reference, k,  match, mismatch, gap_open, gap_extend, context_map, fine_map, max_regions)
+    
+    if reads_dict == None:
+        return None
+    
     output_directory = output_directory.strip('/')
     output_bins = []
     for plasmid in reads_dict:
@@ -239,6 +249,17 @@ def run_medaka_binned(fastq_reads, reference, k, output_directory, args,
     output_bins = write_bins(fastq_reads, reference, k, output_directory, match, mismatch, gap_open, gap_extend,
                             context_map, fine_map, max_regions)
     
+    if output_bins == None:
+        #If the alignment step was broken for single plasmid or (long unique seq), just pass the reads and referense to medaka
+        medaka_wrap.runMedaka(fastq_reads,
+                              reference,
+                              output_directory,
+                              args.threads,
+                              args.model,
+                              args.screenshot,
+                              args.igv)
+        return
+    
     with open(reference) as ref_list:
         #for record, plasmid_bin in zip(SeqIO.parse(ref_list, 'fasta'), output_bins):
         for record in SeqIO.parse(ref_list, 'fasta'):
@@ -251,4 +272,4 @@ def run_medaka_binned(fastq_reads, reference, k, output_directory, args,
                                       plasmid_bin+'_consensus',
                                       args.threads,
                                       args.model, args.screenshot, args.igv)
-                                       
+    return

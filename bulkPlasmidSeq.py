@@ -26,7 +26,7 @@ def pick_submodule(args):
     if args.submod == 'biobin':
         import biobinning as submod
             
-    elif args.submod == 'Medaka':
+    elif args.submod == 'medaka':
         import medaka_wrap as submod
     
     submod.run(reads, reference, outputDir, args)
@@ -127,23 +127,23 @@ def getArgs():
     #Medaka Args, the only Medaka specific arg is -m --model, for Pore and Guppy version
     #Didn't make an argument group for that alone, add to general
     
-    medakaArgs = subparsers.add_parser('Medaka')
+    medakaArgs = subparsers.add_parser('medaka')
     
-    generalArgsMedaka = medakaArgs.add_argument_group('General Arguments')
-    generalArgsMedaka.add_argument('-i', '--input_reads', required=False,
+    generalArgsmedaka = medakaArgs.add_argument_group('General Arguments')
+    generalArgsmedaka.add_argument('-i', '--input_reads', required=False,
                           help= 'input reads (directory to reads or .fastq)')
-    generalArgsMedaka.add_argument('-r', '--reference', required=False,
+    generalArgsmedaka.add_argument('-r', '--reference', required=False,
                           help = 'plasmid sequences (directory or .fa)')
-    generalArgsMedaka.add_argument('-o', '--output_dir', required =False,
+    generalArgsmedaka.add_argument('-o', '--output_dir', required =False,
                           help = 'output directory')
-    generalArgsMedaka.add_argument('-t', '--threads', required = False, default = 2,
+    generalArgsmedaka.add_argument('-t', '--threads', required = False, default = 2,
                           help = 'number of threads, default 2')
-    generalArgsMedaka.add_argument('--double', required = False, action = 'store_true', default = False,
+    generalArgsmedaka.add_argument('--double', required = False, action = 'store_true', default = False,
                           help = 'Double the reference genome, great for visualization, less for consensus generation')
-    generalArgsMedaka.add_argument('-m', '--model', required = False, default = 'r941_min_high_g360',
+    generalArgsmedaka.add_argument('-m', '--model', required = False, default = 'r941_min_high_g360',
                           help = 'Medaka consensus model, Pore/Guppy version, use medaka tools list_models for list')
     
-    generalArgsMedaka.add_argument('--filter', required = False, action='store_true',
+    generalArgsmedaka.add_argument('--filter', required = False, action='store_true',
                        default = False, help = 'Filter reads before analysis')
     
     #IGV screenshot args
@@ -313,7 +313,7 @@ def takeScreenshots(reference, outputDir, igv):
     #IGV is picky about formatting, watch spaces
     template = 'new\nsnapshotDirectory %s\ngenome %s\nload %s\nmaxPanelHeight 400' \
     '\n%sexit'% (output_absolute_dir + '/screenshots', reference_dir,
-                 output_absolute_dir + '/calls_to_draft.bam', stringForIGV)
+                 output_absolute_dir + '/filtered_alignment.bam', stringForIGV)
     
     igvBatch.write(template)
     igvBatch.close()
