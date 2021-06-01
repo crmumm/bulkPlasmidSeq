@@ -36,23 +36,28 @@ def define_aligner(match = 3, mismatch = -6, open_gap = -10, extend = -5):
     return aligner
 
 def getFasta(file):
-    name=''
-    seq=''
+    
     plasmids = defaultdict(list)
-    with open(file, 'rt') as f:    
-        for line in f:
-            if line.startswith('>') and seq: 
-                name = name[1:]
-                plasmids[name] = seq
-                name=line.strip()
-                seq=''
-            elif line.startswith('>'):
-                name=line.strip()
-            else:
-                seq+=line.strip()
-        if name and seq: #last seq
-            name = name[1:]
-            plasmids[name] = seq
+    for plasmid_ref in SeqIO.parse("example.fasta", "fasta"):
+        plasmids[plasmid_ref.id] = plasmid_ref.seq
+        
+#     name=''
+#     seq=''
+#     
+#     with open(file, 'rt') as f:    
+#         for line in f:
+#             if line.startswith('>') and seq: 
+#                 name = name[1:]
+#                 plasmids[name] = seq
+#                 name=line.strip()
+#                 seq=''
+#             elif line.startswith('>'):
+#                 name=line.strip()
+#             else:
+#                 seq+=line.strip()
+#         if name and seq: #last seq
+#             name = name[1:]
+#             plasmids[name] = seq
                 
     return plasmids
 
@@ -256,7 +261,6 @@ def run_medaka_binned(fastq_reads, reference, k, output_directory, args,
                               output_directory,
                               args.threads,
                               args.model,
-                              args.screenshot,
                               args.igv)
         return
     
@@ -271,5 +275,5 @@ def run_medaka_binned(fastq_reads, reference, k, output_directory, args,
                     medaka_wrap.runMedaka(plasmid_bin + '.fastq', '%s.fasta'% plasmid_bin,
                                       plasmid_bin+'_consensus',
                                       args.threads,
-                                      args.model, args.screenshot, args.igv)
+                                      args.model, args.igv)
     return

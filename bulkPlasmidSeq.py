@@ -8,6 +8,7 @@ import argparse
 import os
 import sys
 import subprocess
+from Bio import SeqIO
 
 
 def pick_submodule(args):
@@ -106,9 +107,6 @@ def getArgs():
     #IGV screenshot args Porchop
     igvbiobin = biobinArgs.add_argument_group('IGV arguments for screenshotting')
     
-    igvbiobin.add_argument('--screenshot', required = False, action = 'store_true',
-                     help = 'Take screenshots of IGV for each plasmid')
-    
     igvbiobin.add_argument('--igv', required = False, default = None, help = 'Path to igv.sh')
     
     #NanoFilt args biobin
@@ -148,8 +146,7 @@ def getArgs():
     
     #IGV screenshot args
     igvMedaka = medakaArgs.add_argument_group('IGV arguments for screenshotting')
-    igvMedaka.add_argument('--screenshot', required = False, action = 'store_true',
-                     help = 'Take screenshots of IGV for each plasmid')
+    
     igvMedaka.add_argument('--igv', required = False, default = None, help = 'Path to igv.sh')
     
     
@@ -172,9 +169,6 @@ def getArgs():
     except AttributeError:
         ap.error("No arguments provided. Add -h for help")
     func(args)
-
-    if args.screenshot is True and args.igv is None:
-        sys.exit('Please specify a path to igv.sh for taking screenshots')
         
     return args
 
@@ -330,27 +324,33 @@ def getFasta(file):
     '''
     Returns list of tuples (name, seq) for each plasmid in .fasta 
     '''
-    file = open(file, 'rt')
-    name=''
-    seq=''
+    
     fastaList = []
-    for line in file:
-        # Capture the next header, report what we have, and update
-        if line.startswith('>') and seq: #not first seq
-            name = name[1:] #removes the carrot
-            fastaList.append((name, seq))
-            name=line.strip()
-            seq=''
-            # Get to the first header
-        elif line.startswith('>'):  #first seq
-            name=line.strip()
-        # Just add sequence if it is the only thing there
-        else:
-            seq+=line.strip()
-        # At the end, return the last entries
-    if name and seq: #last seq
-        name = name[1:]
-        fastaList.append((name, seq))                           
+    
+    for plasmid_ref in SeqIO.parse(file, "fasta"):
+        fastaList.append((plasmid_ref.id, plasmid_ref.seq))
+    
+#     file = open(file, 'rt')
+#     name=''
+#     seq=''
+#     for line in file:
+#         # Capture the next header, report what we have, and update
+#         if line.startswith('>') and seq: #not first seq
+#             name = name[1:] #removes the carrot
+#             fastaList.append((name, seq))
+#             name=line.strip()
+#             seq=''
+#             # Get to the first header
+#         elif line.startswith('>'):  #first seq
+#             name=line.strip()
+#         # Just add sequence if it is the only thing there
+#         else:
+#             seq+=line.strip()
+#         # At the end, return the last entries
+#     if name and seq: #last seq
+#         name = name[1:]
+#         fastaList.append((name, seq))
+                         
     return fastaList
        
 if __name__ == "__main__":

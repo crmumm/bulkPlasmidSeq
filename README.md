@@ -37,31 +37,39 @@ Dependencies:
     
     Minimap2
     
+    Integrative Genomics Browser - IGV 
+    
+        Specify --igv path/to/igv.sh to take screenshots of alignments.
+        
+    Biopython
+        
+        Used for IO and marker based binning. 
+        
+        Source: https://biopython.org/wiki/Download
+    
+    Emboss
+        
+        Needle pairwise alignments for consensus alignments.
+        
+        Source: http://emboss.sourceforge.net/download/   
+           
 ______________________________________________________________________
 BulkPlasmidSeq usage examples:
     
-    For binning sequences based on reference - biobin:
+    For binning sequences based on unique sequences in reference - biobin:
   
         python bulkPlasmidSeq.py biobin -i path/to/reads -r path/to/plasmids -o output_directory
     
-    For generating concensus sequences - Medaka:
+    For generating concensus sequences - medaka:
         
-        python bulkPlasmidSeq.py Medaka -i my_reads.fastq -r my_plasmid_genome.fa -o output_directory -t 4
+        python bulkPlasmidSeq.py medaka -i my_reads.fastq -r my_plasmid_genome.fa -o output_directory -t 4
         
-    For unfiltered reads - Guppy filters to Q7 ~85% basecalling accuracy:
+    Filter reads with nanofilt. 
     
-        python bulkPlasmidSeq.py --filter -i unfiltered_reads.fastq -r my_plasmid_genome.fa -q 8 
-
-______________________________________________________________________
-
-Troubleshooting:
-
-     Common Problems:
-	
-	Taking screenshots with IGV crashes or gives a Null Pointer error.
-	
-		Make sure a .genome file has been created for this 'Plasmid Genome' and that
-		this genome is available in the genome dropdown list. This pipeline does not
-		create it the .genome file. To create this file open igv, go to Genomes
-		dropdown menu and use Create .genomes. Give the genome a name and point it to
-		the plasmid_genome.fasta created by the pileline or your reference fasta.  
+        python bulkPlasmidSeq.py medaka --filter \
+            -i unfiltered_reads.fastq \
+            -r my_plasmid_genome.fa \
+            -q 7 \
+            -o output_directroy
+    
+    
