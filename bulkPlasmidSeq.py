@@ -329,27 +329,6 @@ def getFasta(file):
     
     for plasmid_ref in SeqIO.parse(file, "fasta"):
         fastaList.append((plasmid_ref.id, plasmid_ref.seq))
-    
-#     file = open(file, 'rt')
-#     name=''
-#     seq=''
-#     for line in file:
-#         # Capture the next header, report what we have, and update
-#         if line.startswith('>') and seq: #not first seq
-#             name = name[1:] #removes the carrot
-#             fastaList.append((name, seq))
-#             name=line.strip()
-#             seq=''
-#             # Get to the first header
-#         elif line.startswith('>'):  #first seq
-#             name=line.strip()
-#         # Just add sequence if it is the only thing there
-#         else:
-#             seq+=line.strip()
-#         # At the end, return the last entries
-#     if name and seq: #last seq
-#         name = name[1:]
-#         fastaList.append((name, seq))
                          
     return fastaList
        

@@ -40,24 +40,6 @@ def getFasta(file):
     plasmids = defaultdict(list)
     for plasmid_ref in SeqIO.parse("example.fasta", "fasta"):
         plasmids[plasmid_ref.id] = plasmid_ref.seq
-        
-#     name=''
-#     seq=''
-#     
-#     with open(file, 'rt') as f:    
-#         for line in f:
-#             if line.startswith('>') and seq: 
-#                 name = name[1:]
-#                 plasmids[name] = seq
-#                 name=line.strip()
-#                 seq=''
-#             elif line.startswith('>'):
-#                 name=line.strip()
-#             else:
-#                 seq+=line.strip()
-#         if name and seq: #last seq
-#             name = name[1:]
-#             plasmids[name] = seq
                 
     return plasmids
 

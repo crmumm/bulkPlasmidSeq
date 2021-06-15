@@ -87,9 +87,9 @@ def processMedakaOutput(outputDir, reference, igv = None):
         subprocess.run(['mkdir', '%s/consensus_sequences' % outputDir])
         destination = outputDir+'/consensus_sequences/'
         
-        for record_reference in SeqIO.parse(consensusFile, 'fasta'):
-            for record_consensus in SeqIO.parse(reference, 'fasta'):
-                if record_consensus.name in record_reference.name: #Match the consensus to the reference
+        for record_consensus in SeqIO.parse(consensusFile, 'fasta'):
+            for record_reference in SeqIO.parse(reference, 'fasta'):
+                if record_reference.name in record_consensus.name: #Match the consensus to the reference
                     SeqIO.write(record_consensus, destination + record_consensus.name+'_consensus.fasta', 'fasta')
                     SeqIO.write(record_reference, outputDir + '/' +record_reference.name+'_reference.fasta', 'fasta')
                     needle_commands.append(NeedleCommandline(asequence = outputDir + '/'+ record_reference.name+'_reference.fasta',
