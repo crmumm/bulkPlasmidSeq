@@ -181,7 +181,7 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
     '''
     
     if os.path.isfile(outputDir):
-        sys.exit('Output directory exists exists as a file.')
+        sys.exit('Output directory exists')
         
     elif not os.path.exists(outputDir):
         subprocess.run(['mkdir %s' % outputDir], shell = True)
@@ -201,7 +201,7 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
                                           
     elif os.path.isfile(inputFiles):
         #Checks if fastq format
-        if str(inputFiles).lower().endswith('.fastq'):
+        if str(inputFiles).lower().endswith('.fastq') or str(inputFiles).lower().endswith('.fq'):
             reads = inputFiles
         else:
             sys.exit('Error: Reads should be in .fastq format ')
@@ -240,8 +240,8 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
         double = open('%s/double_reference_genome.fasta' % outputDir, 'a+')
         for seq in seqs:
             double.write('>' + seq[0] + '\n')
-            double.write(seq[1])
-            double.write(seq[1] + '\n')
+            double.write(str(seq[1]))
+            double.write(str(seq[1]) + '\n')
 
         double.close()
         reference = '%s/double_reference_genome.fasta' % outputDir
