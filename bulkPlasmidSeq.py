@@ -89,6 +89,8 @@ def getArgs():
     
     generalArgsbiobin.add_argument('--double', required = False, action = 'store_true', default = False,
                           help = 'Double the reference genome, great for visualization, less for consensus generation')
+    generalArgsbiobin.add_argument('--trim', required = False, action = 'store_true', default = False,
+                          help = 'Trim adapters from reads with Porechop')
     
     biobin = biobinArgs.add_argument_group('biobin Specific arguments')
     
@@ -138,6 +140,8 @@ def getArgs():
                           help = 'number of threads, default 2')
     generalArgsmedaka.add_argument('--double', required = False, action = 'store_true', default = False,
                           help = 'Double the reference genome, great for visualization, less for consensus generation')
+    generalArgsmedaka.add_argument('--trim', required = False, action = 'store_true', default = False,
+                          help = 'Trim adapters from reads with Porechop')
     generalArgsmedaka.add_argument('-m', '--model', required = False, default = 'r941_min_high_g360',
                           help = 'Medaka consensus model, Pore/Guppy version, use medaka tools list_models for list')
     
@@ -198,6 +202,9 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
             sys.exit('Could find reads in directory, check for fastq files in input')
         
         reads = '%s/input_reads.fastq' % outputDir
+        
+    if trim:
+        reads = trim_reads(reads)
                                           
     elif os.path.isfile(inputFiles):
         #Checks if fastq format
@@ -247,6 +254,17 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
         reference = '%s/double_reference_genome.fasta' % outputDir
          
     return reads, reference, outputDir
+
+def trim_reads(reads, outputDir):
+    '''
+    Trim reads with Porechop
+    '''
+    
+    subprocess.run(['porechop -i %s -o %s/trimmed_reads.fastq' % (reads, outputDir)])
+    
+    trimmed_reads = reads = '%s/trimmed_reads.fastq' % outputDir
+    
+    return trimmed_reads
 
 
 def filterReads(reads, outputDir, maxLength, minLength, quality):
