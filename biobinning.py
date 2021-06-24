@@ -38,7 +38,7 @@ def define_aligner(match = 3, mismatch = -6, open_gap = -10, extend = -5):
 def getFasta(file):
     
     plasmids = defaultdict(list)
-    for plasmid_ref in SeqIO.parse("example.fasta", "fasta"):
+    for plasmid_ref in SeqIO.parse(file, "fasta"):
         plasmids[plasmid_ref.id] = plasmid_ref.seq
                 
     return plasmids
@@ -75,9 +75,13 @@ def unique_kmers(file, k):
     plasmids = build_kmers(file, k)
     unique_kmers = defaultdict(list)
     for x in plasmids:
+#         for other in plasmids:
+#             for a in plasmids[other]:
+#                 print(a[0])
+            
         op = [bc[0] for other in plasmids for bc in plasmids[other] if other != x]
         for marker in plasmids[x]:
-            if marker[0] not in op and reverse_complement(marker[0]) not in op:
+            if marker[0] not in op and reverse_complement(str(marker[0])) not in op:
                 unique_kmers[x].append(marker)
                 
     return unique_kmers
@@ -177,7 +181,7 @@ def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_exten
     for plasmid in markers_dict:
         for marker_region in markers_dict[plasmid]:
             context_fwd_marker = marker_region[3]
-            context_rev_marker = reverse_complement(context_fwd_marker)
+            context_rev_marker = reverse_complement(str(context_fwd_marker))
             #Match with context
         
             best_score = aligner.score(context_fwd_marker, context_fwd_marker)
@@ -207,7 +211,7 @@ def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_exten
                         #Get the sequence that the aligned to the larger region
                         top_rev_alignment = sorted(aligner.align(record.seq, context_fwd_marker))[0]
                         subseq = record.seq[top_rev_alignment.aligned[0][0][0]:top_rev_alignment.aligned[0][-1][-1]]
-                        if aligner.score(subseq, reverse_complement(marker_region[2])) >= float(fine_alignment_score)*best_fine_score:
+                        if aligner.score(subseq, reverse_complement(str(marker_region[2])) >= float(fine_alignment_score)*best_fine_score):
                             reads_dict[plasmid].append(record)
                 
     return reads_dict

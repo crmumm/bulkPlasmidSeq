@@ -15,7 +15,7 @@ def pick_submodule(args):
     
     if None not in (args.input_reads, args.reference, args.output_dir):
     
-        reads, reference, outputDir = loadReads(args.input_reads, args.reference, args.output_dir, args.double)
+        reads, reference, outputDir = loadReads(args.input_reads, args.reference, args.output_dir, args.trim, args.double)
         
     else:
         sys.exit('Missing one of the following arguments, --input(-i), --reference(-r), --output_dir(-o)')
@@ -177,7 +177,7 @@ def getArgs():
     return args
 
 
-def loadReads(inputFiles, referenceFiles, outputDir, double = False):
+def loadReads(inputFiles, referenceFiles, outputDir, trim, double = False):
     '''
     This function checks to make the input, reference, and outputDir. If input or reference arguments are
     directories, this function concatenates the .fasta or fastq files to make the input reads easier to work with
@@ -202,16 +202,16 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
             sys.exit('Could find reads in directory, check for fastq files in input')
         
         reads = '%s/input_reads.fastq' % outputDir
-        
-    if trim:
-        reads = trim_reads(reads)
                                           
     elif os.path.isfile(inputFiles):
         #Checks if fastq format
-        if str(inputFiles).lower().endswith('.fastq') or str(inputFiles).lower().endswith('.fq'):
+        if str(inputFiles).lower().endswith('.fastq'):
             reads = inputFiles
         else:
             sys.exit('Error: Reads should be in .fastq format ')
+    
+    if trim:
+        reads = trim_reads(reads)
     
     if not os.path.exists(referenceFiles):
         sys.exit('Reference not found')
@@ -246,6 +246,7 @@ def loadReads(inputFiles, referenceFiles, outputDir, double = False):
         seqs = getFasta(reference)
         double = open('%s/double_reference_genome.fasta' % outputDir, 'a+')
         for seq in seqs:
+            #Writes two concatinated plasmid sequences for alignment
             double.write('>' + seq[0] + '\n')
             double.write(str(seq[1]))
             double.write(str(seq[1]) + '\n')
