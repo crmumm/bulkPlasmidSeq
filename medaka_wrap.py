@@ -90,9 +90,13 @@ def processMedakaOutput(outputDir, reference, igv = None):
         for record_consensus in SeqIO.parse(consensusFile, 'fasta'):
             for record_reference in SeqIO.parse(reference, 'fasta'):
                 if record_reference.name in record_consensus.name: #Match the consensus to the reference
+                    print('Consensus source  = ' + str(consensusFile))
+                    print('A seq, reference = ' + record_reference.name)
+                    print('B seq, consensus = ' + record_consensus)
                     SeqIO.write(record_consensus, destination + record_consensus.name+'_consensus.fasta', 'fasta')
                     SeqIO.write(record_reference, outputDir + '/' +record_reference.name+'_reference.fasta', 'fasta')
-                    needle_commands.append(NeedleCommandline(asequence = outputDir + '/'+ record_reference.name+'_reference.fasta',
+                    needle_commands.append(NeedleCommandline(asequence = outputDir 
+                                                             + '/'+ record_reference.name+'_reference.fasta',
                                                          bsequence = destination + record_consensus.name+'_consensus.fasta',
                                                          gapopen = 10,
                                                          gapextend = 0.5,

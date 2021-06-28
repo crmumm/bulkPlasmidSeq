@@ -211,7 +211,7 @@ def loadReads(inputFiles, referenceFiles, outputDir, trim, double = False):
             sys.exit('Error: Reads should be in .fastq format ')
     
     if trim:
-        reads = trim_reads(reads)
+        reads = trim_reads(reads, outputDir)
     
     if not os.path.exists(referenceFiles):
         sys.exit('Reference not found')
@@ -261,7 +261,7 @@ def trim_reads(reads, outputDir):
     Trim reads with Porechop
     '''
     
-    subprocess.run(['porechop -i %s -o %s/trimmed_reads.fastq' % (reads, outputDir)])
+    subprocess.run(['porechop -i %s -o %s/trimmed_reads.fastq' % (reads, outputDir)], shell = True)
     
     trimmed_reads = reads = '%s/trimmed_reads.fastq' % outputDir
     
