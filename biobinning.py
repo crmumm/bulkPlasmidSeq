@@ -28,10 +28,10 @@ def define_aligner(match = 3, mismatch = -6, open_gap = -10, extend = -5):
     
     aligner = Align.PairwiseAligner()
     aligner.mode = 'local'
-    aligner.match_score = match 
-    aligner.mismatch_score = mismatch
-    aligner.open_gap_score = open_gap
-    aligner.extend_gap_score = extend
+    aligner.match_score = int(match) 
+    aligner.mismatch_score = int(mismatch)
+    aligner.open_gap_score = int(open_gap)
+    aligner.extend_gap_score = int(extend)
     
     return aligner
 
@@ -211,7 +211,7 @@ def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_exten
                         #Get the sequence that the aligned to the larger region
                         top_rev_alignment = sorted(aligner.align(record.seq, context_fwd_marker))[0]
                         subseq = record.seq[top_rev_alignment.aligned[0][0][0]:top_rev_alignment.aligned[0][-1][-1]]
-                        if aligner.score(subseq, reverse_complement(str(marker_region[2])) >= float(fine_alignment_score)*best_fine_score):
+                        if aligner.score(subseq, reverse_complement(str(marker_region[2]))) >= float(fine_alignment_score)*best_fine_score:
                             reads_dict[plasmid].append(record)
                 
     return reads_dict

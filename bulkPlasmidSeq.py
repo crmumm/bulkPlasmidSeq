@@ -9,13 +9,14 @@ import os
 import sys
 import subprocess
 from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
 
 
 def pick_submodule(args):
     
     if None not in (args.input_reads, args.reference, args.output_dir):
     
-        reads, reference, outputDir = loadReads(args.input_reads, args.reference, args.output_dir, args.trim, args.double)
+        reads, reference, outputDir = loadReads(args.input_reads, args.reference, args.output_dir, args.restriction_enzyme, args.trim, args.double)
         
     else:
         sys.exit('Missing one of the following arguments, --input(-i), --reference(-r), --output_dir(-o)')
@@ -106,6 +107,9 @@ def getArgs():
     biobin.add_argument('--fine_map', required = False, default = 0.95)
     biobin.add_argument('--max_regions', required = False, default = 3, help = 'Maximum number of regions to align/score')
     
+    biobin.add_argument('-re', '--restriction_enzyme', required = False, action = 'store_true', default = False,
+                                   help = 'Prompts user to input restriction enzyme cut sites to rotate reference')
+    
     #IGV screenshot args Porchop
     igvbiobin = biobinArgs.add_argument_group('IGV arguments for screenshotting')
     
@@ -148,6 +152,9 @@ def getArgs():
     generalArgsmedaka.add_argument('--filter', required = False, action='store_true',
                        default = False, help = 'Filter reads before analysis')
     
+    generalArgsmedaka.add_argument('-re', '--restriction_enzyme', required = False, action = 'store_true',
+                                   help = 'Prompts user to input restriction enzyme cut sites to rotate reference')
+    
     #IGV screenshot args
     igvMedaka = medakaArgs.add_argument_group('IGV arguments for screenshotting')
     
@@ -177,7 +184,7 @@ def getArgs():
     return args
 
 
-def loadReads(inputFiles, referenceFiles, outputDir, trim, double = False):
+def loadReads(inputFiles, referenceFiles, outputDir, restriction_enzyme,  trim, double = False):
     '''
     This function checks to make the input, reference, and outputDir. If input or reference arguments are
     directories, this function concatenates the .fasta or fastq files to make the input reads easier to work with
@@ -218,7 +225,7 @@ def loadReads(inputFiles, referenceFiles, outputDir, trim, double = False):
     
 
     elif os.path.isdir(referenceFiles):
-        #print('Directory was given for plasmid reference, concatenating these to output_ref.fasta \n')
+        #Concatinates all files ending with .fa or .fasta into one plasmid genome
         inRefFiles = os.listdir(referenceFiles)
         keep = []
         [keep.append(referenceFiles + keepFile) for keepFile in inRefFiles \
@@ -238,6 +245,11 @@ def loadReads(inputFiles, referenceFiles, outputDir, trim, double = False):
             reference = referenceFiles
         else:
             sys.exit('Error: Reference sequence should be in .fasta or .fa format')
+            
+    if restriction_enzyme:
+        
+        reference = rotate_refs(reference, outputDir)
+        print(reference)
     
     if double:
         print('\n Double is True, duplicating the reference sequence, used for visualization  of plasmid fragmentation\n')
@@ -256,6 +268,27 @@ def loadReads(inputFiles, referenceFiles, outputDir, trim, double = False):
          
     return reads, reference, outputDir
 
+def rotate_refs(reference, outputDir):
+    """
+    Prompts users for restriciton enzyme cut sites and writes a new reference file
+    """
+    rotated_plasmids = []
+    
+    for plasmid_ref in SeqIO.parse(reference, "fasta"):
+        #Try
+        start = int(input('Enter cut site for: ' + plasmid_ref.name + ': '))
+        rotated_seq = plasmid_ref.seq[start:] + plasmid_ref.seq[:start]
+        new_plasmid = SeqRecord(rotated_seq, plasmid_ref.name)
+                
+        #Except
+        rotated_plasmids.append(new_plasmid)
+                
+    output_reference = outputDir + '/rotated_reference.fasta'
+    #with open('%s/rotated_reference.fasta' % outputDir, 'wb') as rotated:
+    SeqIO.write(rotated_plasmids, output_reference, 'fasta')
+        
+    return output_reference
+    
 def trim_reads(reads, outputDir):
     '''
     Trim reads with Porechop
