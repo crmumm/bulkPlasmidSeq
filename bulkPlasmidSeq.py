@@ -8,6 +8,7 @@ import argparse
 import os
 import sys
 import subprocess
+import yaml
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 
@@ -16,7 +17,9 @@ def pick_submodule(args):
     
     if None not in (args.input_reads, args.reference, args.output_dir):
     
-        reads, reference, outputDir = loadReads(args.input_reads, args.reference, args.output_dir, args.restriction_enzyme, args.trim, args.double)
+        reads, reference, outputDir = loadReads(args.input_reads, args.reference, args.output_dir,
+                                                args.restriction_enzyme, args.restriction_enzyme_table,
+                                                args.trim, args.double)
         
     else:
         sys.exit('Missing one of the following arguments, --input(-i), --reference(-r), --output_dir(-o)')
@@ -109,6 +112,8 @@ def getArgs():
     
     biobin.add_argument('-re', '--restriction_enzyme', required = False, action = 'store_true', default = False,
                                    help = 'Prompts user to input restriction enzyme cut sites to rotate reference')
+    biobin.add_argument('--restriction_enzyme_table', required = False,
+                        help = 'Provide a yaml with cut sites for all plasmids')
     
     #IGV screenshot args Porchop
     igvbiobin = biobinArgs.add_argument_group('IGV arguments for screenshotting')
@@ -154,6 +159,8 @@ def getArgs():
     
     generalArgsmedaka.add_argument('-re', '--restriction_enzyme', required = False, action = 'store_true',
                                    help = 'Prompts user to input restriction enzyme cut sites to rotate reference')
+    generalArgsmedaka.add_argument('--restriction_enzyme_table', required = False,
+                        help = 'Provide a yaml with cut sites for all plasmids')
     
     #IGV screenshot args
     igvMedaka = medakaArgs.add_argument_group('IGV arguments for screenshotting')
@@ -184,7 +191,7 @@ def getArgs():
     return args
 
 
-def loadReads(inputFiles, referenceFiles, outputDir, restriction_enzyme,  trim, double = False):
+def loadReads(inputFiles, referenceFiles, outputDir, restriction_enzyme, restriction_enzyme_table, trim, double = False):
     '''
     This function checks to make the input, reference, and outputDir. If input or reference arguments are
     directories, this function concatenates the .fasta or fastq files to make the input reads easier to work with
@@ -247,9 +254,10 @@ def loadReads(inputFiles, referenceFiles, outputDir, restriction_enzyme,  trim, 
             sys.exit('Error: Reference sequence should be in .fasta or .fa format')
             
     if restriction_enzyme:
+        reference = rotate_refs(reference, outputDir, None)
         
-        reference = rotate_refs(reference, outputDir)
-        print(reference)
+    if restriction_enzyme_table:
+        reference = rotate_refs(reference, outputDir, restriction_enzyme_table)
     
     if double:
         print('\n Double is True, duplicating the reference sequence, used for visualization  of plasmid fragmentation\n')
@@ -268,26 +276,38 @@ def loadReads(inputFiles, referenceFiles, outputDir, restriction_enzyme,  trim, 
          
     return reads, reference, outputDir
 
-def rotate_refs(reference, outputDir):
+def rotate_refs(reference, outputDir, restriction_enzyme_table):
     """
     Prompts users for restriciton enzyme cut sites and writes a new reference file
     """
     rotated_plasmids = []
     
-    for plasmid_ref in SeqIO.parse(reference, "fasta"):
-        #Try
-        start = int(input('Enter cut site for: ' + plasmid_ref.name + ': '))
-        rotated_seq = plasmid_ref.seq[start:] + plasmid_ref.seq[:start]
-        new_plasmid = SeqRecord(rotated_seq, plasmid_ref.name)
-                
-        #Except
-        rotated_plasmids.append(new_plasmid)
+    if restriction_enzyme_table != None:
+        
+        re_table = open(restriction_enzyme_table, 'r')
+        plasmid_cut_site = yaml.safe_load(re_table)
+        for plasmid_ref in SeqIO.parse(reference, "fasta"):
+            start = int(plasmid_cut_site[plasmid_ref.name])
+            rotated_seq = plasmid_ref.seq[start:] + plasmid_ref.seq[:start]
+            new_plasmid = SeqRecord(rotated_seq, plasmid_ref.name)
+            rotated_plasmids.append(new_plasmid)
+            
+        re_table.close()
+        
+    else:
+        
+        for plasmid_ref in SeqIO.parse(reference, "fasta"):
+            start = int(input('Enter cut site for: ' + plasmid_ref.name + ': '))
+            rotated_seq = plasmid_ref.seq[start:] + plasmid_ref.seq[:start]
+            new_plasmid = SeqRecord(rotated_seq, plasmid_ref.name)
+            rotated_plasmids.append(new_plasmid)
                 
     output_reference = outputDir + '/rotated_reference.fasta'
     #with open('%s/rotated_reference.fasta' % outputDir, 'wb') as rotated:
     SeqIO.write(rotated_plasmids, output_reference, 'fasta')
         
     return output_reference
+        
     
 def trim_reads(reads, outputDir):
     '''
