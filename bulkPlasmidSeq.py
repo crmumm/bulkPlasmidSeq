@@ -9,17 +9,17 @@ import os
 import sys
 import subprocess
 import yaml
-from Bio import SeqIO
+from Bio import SeqIO,  Restriction
 from Bio.SeqRecord import SeqRecord
 
 
 def pick_submodule(args):
     
     if None not in (args.input_reads, args.reference, args.output_dir):
-    
+        #removed args.double - 20210728
         reads, reference, outputDir = loadReads(args.input_reads, args.reference, args.output_dir,
                                                 args.restriction_enzyme, args.restriction_enzyme_table,
-                                                args.trim, args.double)
+                                                args.trim)
         
     else:
         sys.exit('Missing one of the following arguments, --input(-i), --reference(-r), --output_dir(-o)')
@@ -91,8 +91,6 @@ def getArgs():
     generalArgsbiobin.add_argument('-m', '--model', required = False, default = 'r941_min_high_g360',
                           help = 'Medaka consensus model, Pore/Guppy version, use medaka tools list_models for list')
     
-    generalArgsbiobin.add_argument('--double', required = False, action = 'store_true', default = False,
-                          help = 'Double the reference genome, great for visualization, less for consensus generation')
     generalArgsbiobin.add_argument('--trim', required = False, action = 'store_true', default = False,
                           help = 'Trim adapters from reads with Porechop')
     
@@ -147,8 +145,6 @@ def getArgs():
                           help = 'output directory')
     generalArgsmedaka.add_argument('-t', '--threads', required = False, default = 2,
                           help = 'number of threads, default 2')
-    generalArgsmedaka.add_argument('--double', required = False, action = 'store_true', default = False,
-                          help = 'Double the reference genome, great for visualization, less for consensus generation')
     generalArgsmedaka.add_argument('--trim', required = False, action = 'store_true', default = False,
                           help = 'Trim adapters from reads with Porechop')
     generalArgsmedaka.add_argument('-m', '--model', required = False, default = 'r941_min_high_g360',
@@ -191,11 +187,13 @@ def getArgs():
     return args
 
 
-def loadReads(inputFiles, referenceFiles, outputDir, restriction_enzyme, restriction_enzyme_table, trim, double = False):
+def loadReads(inputFiles, referenceFiles, outputDir, restriction_enzyme, restriction_enzyme_table, trim):
     '''
     This function checks to make the input, reference, and outputDir. If input or reference arguments are
     directories, this function concatenates the .fasta or fastq files to make the input reads easier to work with
     and the plasmids into a 'Plasmid Genome.' Checks that outputDir is not a file.
+    
+    #Removed double - 20210728
     '''
     
     if os.path.isfile(outputDir):
@@ -218,11 +216,11 @@ def loadReads(inputFiles, referenceFiles, outputDir, restriction_enzyme, restric
         reads = '%s/input_reads.fastq' % outputDir
                                           
     elif os.path.isfile(inputFiles):
-        #Checks if fastq format
-        if str(inputFiles).lower().endswith('.fastq'):
+        #Checks if fastq (or fq) format 
+        if str(inputFiles).lower().endswith('.fastq') or str(inputFiles).lower.endswith('.fq'):
             reads = inputFiles
         else:
-            sys.exit('Error: Reads should be in .fastq format ')
+            sys.exit('Error: Reads should be in .fastq (or .fq) format ')
     
     if trim:
         reads = trim_reads(reads, outputDir)
@@ -232,16 +230,20 @@ def loadReads(inputFiles, referenceFiles, outputDir, restriction_enzyme, restric
     
 
     elif os.path.isdir(referenceFiles):
-        #Concatinates all files ending with .fa or .fasta into one plasmid genome
+        #Concatenates all files ending with .fa or .fasta into one plasmid genome
         inRefFiles = os.listdir(referenceFiles)
-        keep = []
-        [keep.append(referenceFiles + keepFile) for keepFile in inRefFiles \
-         if keepFile.endswith('.fa') or keepFile.endswith('.fasta')]
-        
-        with open('%s/plasmid_genome_ref.fasta' % outputDir, 'wb') as outfile:
-            for f in keep:
-                with open(f, "rb") as infile:
-                    outfile.write(infile.read())
+        with open('%s/plasmid_genome_ref.fasta' % outputDir, 'w') as outfile:
+            for keepFile in inRefFiles:
+                full_path_ref = os.path.join(referenceFiles, keepFile)
+                if os.path.isfile(full_path_ref):
+                    if full_path_ref.endswith('.fa') or full_path_ref.endswith('.fasta'):
+                        with open(full_path_ref, "r") as infile:
+                            for seq_record in SeqIO.parse(infile, "fasta"):
+                                SeqIO.write(seq_record, outfile, "fasta")
+                                
+            
+        outfile.close()
+        infile.close()
             
         reference = '%s/plasmid_genome_ref.fasta' % outputDir
 
@@ -249,7 +251,16 @@ def loadReads(inputFiles, referenceFiles, outputDir, restriction_enzyme, restric
     elif os.path.isfile(referenceFiles):
         #Checks if reference is already assembled in to plasmid genome
         if str(referenceFiles).lower().endswith('.fa') or str(referenceFiles).lower().endswith('.fasta'):
-            reference = referenceFiles
+            with open('%s/plasmid_genome_ref.fasta' % outputDir, 'w') as outfile:
+                with open(referenceFiles, "r") as infile:
+                    for seq_record in SeqIO.parse(infile, "fasta"):
+                        SeqIO.write(seq_record, outfile, "fasta")
+                        
+            outfile.close()
+            infile.close()
+            
+            reference = '%s/plasmid_genome_ref.fasta' % outputDir
+
         else:
             sys.exit('Error: Reference sequence should be in .fasta or .fa format')
             
@@ -258,21 +269,6 @@ def loadReads(inputFiles, referenceFiles, outputDir, restriction_enzyme, restric
         
     if restriction_enzyme_table:
         reference = rotate_refs(reference, outputDir, restriction_enzyme_table)
-    
-    if double:
-        print('\n Double is True, duplicating the reference sequence, used for visualization  of plasmid fragmentation\n')
-        #Duplicates the plasmids in the reference, used as an argument with Medaka. 
-        #Great for visualization, not consensus generation/polishing
-        seqs = getFasta(reference)
-        double = open('%s/double_reference_genome.fasta' % outputDir, 'a+')
-        for seq in seqs:
-            #Writes two concatinated plasmid sequences for alignment
-            double.write('>' + seq[0] + '\n')
-            double.write(str(seq[1]))
-            double.write(str(seq[1]) + '\n')
-
-        double.close()
-        reference = '%s/double_reference_genome.fasta' % outputDir
          
     return reads, reference, outputDir
 
@@ -287,20 +283,66 @@ def rotate_refs(reference, outputDir, restriction_enzyme_table):
         re_table = open(restriction_enzyme_table, 'r')
         plasmid_cut_site = yaml.safe_load(re_table)
         for plasmid_ref in SeqIO.parse(reference, "fasta"):
-            start = int(plasmid_cut_site[plasmid_ref.name])
-            rotated_seq = plasmid_ref.seq[start:] + plasmid_ref.seq[:start]
+            enzyme = plasmid_cut_site[plasmid_ref.name]['enzyme']
+            cut_site = int(plasmid_cut_site[plasmid_ref.name]['cut-site'])
+            
+            if enzyme != None:
+                batch = Restriction.RestrictionBatch([enzyme])
+                for provided_enzyme in batch:
+                    search_site = batch.search(plasmid_ref.seq, linear = False)
+                    if len(search_site[provided_enzyme]) == 0:
+                        sys.exit('No cut sites found for provided enzyme: ' + str(provided_enzyme))
+                    if len(search_site[provided_enzyme]) > 1:
+                        sys.exit('Provided enzyme has more than 1 cut site')
+                    if cut_site != None:
+                        if search_site[provided_enzyme][0] != int(cut_site):
+                            sys.exit('Provided cut site does not match found cut site')
+                    else:
+                        cut_site = int(search_site[provided_enzyme][0])
+                    
+            rotated_seq = plasmid_ref.seq[cut_site:] + plasmid_ref.seq[:cut_site]
             new_plasmid = SeqRecord(rotated_seq, plasmid_ref.name)
             rotated_plasmids.append(new_plasmid)
             
         re_table.close()
         
     else:
-        
+        #Import all NEB enzyme
+        neb_enzymes = Restriction.RestrictionBatch(first=[], suppliers=['N'])
+        #for plasmid_ref in SeqIO.parse(reference, "fasta"):
         for plasmid_ref in SeqIO.parse(reference, "fasta"):
-            start = int(input('Enter cut site for: ' + plasmid_ref.name + ': '))
-            rotated_seq = plasmid_ref.seq[start:] + plasmid_ref.seq[:start]
-            new_plasmid = SeqRecord(rotated_seq, plasmid_ref.name)
-            rotated_plasmids.append(new_plasmid)
+            #for single_enzyme in enzymes:
+            result = neb_enzymes.search(plasmid_ref.seq, linear = False)
+            
+            #Find all the single cutters
+            for single_enzyme in result:
+                if len(result[single_enzyme]) == 1:
+                    print(single_enzyme)
+                    
+                    
+            selected_enzyme = input('Please enter one of the available unique cutting NEB enzymes above for: ' \
+                          + plasmid_ref.name + ': ')
+            
+            found_enzyme = False
+            attempt = 0
+            cut_site = None
+            while found_enzyme == False and attempt <= 2:
+                try:
+                    selected_enzyme = input('Not found, please enter an enzyme above: ' \
+                              + plasmid_ref.name + ': ')
+                    cut_site = result[selected_enzyme][0]
+                    found_enzyme = True
+                except KeyError:
+                    attempt += 1
+                    
+            if cut_site == None:
+                sys.exit('Restriction enzyme cut site not found')
+                
+                
+#             rotated_seq = plasmid_ref.seq[start:] + plasmid_ref.seq[:start]
+#             new_plasmid = SeqRecord(rotated_seq, plasmid_ref.name)
+#             rotated_plasmids.append(new_plasmid)
+            
                 
     output_reference = outputDir + '/rotated_reference.fasta'
     #with open('%s/rotated_reference.fasta' % outputDir, 'wb') as rotated:
@@ -386,7 +428,6 @@ def takeScreenshots(reference, outputDir, igv):
     
     if not igv.lower().endswith('.sh'):
         sys.exit('\n Taking screenshots needs path to igv.sh \n')
-        
     #Run igv.sh -b batchfile.bat
     #Quiet the java stdout
     subprocess.run(['%s -b %s' % (igv, output_absolute_dir+ '/igv_screenshot.bat')], shell = True)
