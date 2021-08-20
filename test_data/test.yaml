@@ -1,4 +1,7 @@
 ---
 mp184_pEctrl-si-1-fw:
     enzyme: EcoRI
-    cut-site: 13
+    cut-site: 0
+mp185_seq:
+    enzyme:
+    cut-site: 30

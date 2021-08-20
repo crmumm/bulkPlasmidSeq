@@ -11,6 +11,7 @@ import subprocess
 import yaml
 from Bio import SeqIO,  Restriction
 from Bio.SeqRecord import SeqRecord
+from Bio.Seq import Seq
 
 
 def pick_submodule(args):
@@ -283,67 +284,78 @@ def rotate_refs(reference, outputDir, restriction_enzyme_table):
         re_table = open(restriction_enzyme_table, 'r')
         plasmid_cut_site = yaml.safe_load(re_table)
         for plasmid_ref in SeqIO.parse(reference, "fasta"):
-            enzyme = plasmid_cut_site[plasmid_ref.name]['enzyme']
-            cut_site = int(plasmid_cut_site[plasmid_ref.name]['cut-site'])
             
+            try:
+                enzyme = plasmid_cut_site[plasmid_ref.name]['enzyme']
+                cut_site = plasmid_cut_site[plasmid_ref.name]['cut-site']
+                
+            except KeyError:
+                #Catches if the plasmid was not provided. KeyError for enzyme
+                cut_site = 0
+                enzyme = None
+             
+            if enzyme == None and cut_site == None:
+                cut_site = 0
+                
             if enzyme != None:
                 batch = Restriction.RestrictionBatch([enzyme])
                 for provided_enzyme in batch:
                     search_site = batch.search(plasmid_ref.seq, linear = False)
                     if len(search_site[provided_enzyme]) == 0:
-                        sys.exit('No cut sites found for provided enzyme: ' + str(provided_enzyme))
+                        sys.exit('No cut sites found in: ' + str(plasmid_ref.name) + '. For provided enzyme: ' + str(provided_enzyme))
                     if len(search_site[provided_enzyme]) > 1:
                         sys.exit('Provided enzyme has more than 1 cut site')
-                    if cut_site != None:
-                        if search_site[provided_enzyme][0] != int(cut_site):
-                            sys.exit('Provided cut site does not match found cut site')
                     else:
                         cut_site = int(search_site[provided_enzyme][0])
-                    
+                        
             rotated_seq = plasmid_ref.seq[cut_site:] + plasmid_ref.seq[:cut_site]
-            new_plasmid = SeqRecord(rotated_seq, plasmid_ref.name)
+            new_plasmid = SeqRecord(rotated_seq, 
+                                    id = plasmid_ref.name,
+                                    description = '')
+
             rotated_plasmids.append(new_plasmid)
             
         re_table.close()
         
     else:
-        #Import all NEB enzyme
-        neb_enzymes = Restriction.RestrictionBatch(first=[], suppliers=['N'])
+        #Import all commercial enzymes
+        commercial_enzymes = Restriction.CommOnly
         #for plasmid_ref in SeqIO.parse(reference, "fasta"):
         for plasmid_ref in SeqIO.parse(reference, "fasta"):
             #for single_enzyme in enzymes:
-            result = neb_enzymes.search(plasmid_ref.seq, linear = False)
-            
+            result = commercial_enzymes.search(plasmid_ref.seq, linear = False)
+            single_cutters = Restriction.RestrictionBatch()
             #Find all the single cutters
             for single_enzyme in result:
                 if len(result[single_enzyme]) == 1:
+                    single_cutters.add(single_enzyme)
                     print(single_enzyme)
-                    
-                    
-            selected_enzyme = input('Please enter one of the available unique cutting NEB enzymes above for: ' \
-                          + plasmid_ref.name + ': ')
-            
+                                
             found_enzyme = False
             attempt = 0
             cut_site = None
             while found_enzyme == False and attempt <= 2:
-                try:
-                    selected_enzyme = input('Not found, please enter an enzyme above: ' \
-                              + plasmid_ref.name + ': ')
-                    cut_site = result[selected_enzyme][0]
-                    found_enzyme = True
-                except KeyError:
-                    attempt += 1
+                selected_enzyme = input('Please enter one of the available unique cutting enzymes above for: ' \
+                          + plasmid_ref.name + ': ')
+                
+                for available in single_cutters:
+                    if selected_enzyme == str(available):
+                        found_enzyme = True
+                        selected_enzyme = available
+                        cut_site = int(result[available][0])
                     
+                attempt += 1
+                
             if cut_site == None:
-                sys.exit('Restriction enzyme cut site not found')
-                
-                
-#             rotated_seq = plasmid_ref.seq[start:] + plasmid_ref.seq[:start]
-#             new_plasmid = SeqRecord(rotated_seq, plasmid_ref.name)
-#             rotated_plasmids.append(new_plasmid)
+                sys.exit('Available enzyme not selected, exiting')
             
-                
+            print(plasmid_ref.seq)
+            rotated_seq = selected_enzyme.catalyse(plasmid_ref.seq, linear = False)
+            #rotated_seq.name = pl
+            #rotated_seq = plasmid_ref.seq[cut_site-1:] + plasmid_ref.seq[:cut_site]
+            new_plasmid = SeqRecord(rotated_seq)
+            rotated_plasmids.append(new_plasmid)
+
     output_reference = outputDir + '/rotated_reference.fasta'
     #with open('%s/rotated_reference.fasta' % outputDir, 'wb') as rotated:
     SeqIO.write(rotated_plasmids, output_reference, 'fasta')
