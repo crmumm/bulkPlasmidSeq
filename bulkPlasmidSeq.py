@@ -1,5 +1,5 @@
 '''
-Camille Mumm - Boyle Lab 2021
+Boyle Lab 2021
 
 Uses Medaka (https://github.com/nanoporetech/medaka) and 
 NanoFilt (https://github.com/wdecoster/nanofilt) to process reads from bulk plasmid sequencing. 
@@ -334,6 +334,11 @@ def rotate_refs(reference, outputDir, restriction_enzyme_table):
             found_enzyme = False
             attempt = 0
             cut_site = None
+            if len(single_cutters) == 0:
+                print('No unique cutters found for plasmid, cut site set to 0')
+                cut_site = 0
+                found_enzyme = True
+
             while found_enzyme == False and attempt <= 2:
                 selected_enzyme = input('Please enter one of the available unique cutting enzymes above for: ' \
                           + plasmid_ref.name + ': ')
