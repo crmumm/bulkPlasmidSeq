@@ -308,7 +308,7 @@ def rotate_refs(reference, outputDir, restriction_enzyme_table):
                     else:
                         cut_site = int(search_site[provided_enzyme][0])
                         
-            rotated_seq = plasmid_ref.seq[cut_site:] + plasmid_ref.seq[:cut_site]
+            rotated_seq = plasmid_ref.seq[cut_site-1:] + plasmid_ref.seq[:cut_site-1]
             new_plasmid = SeqRecord(rotated_seq, 
                                     id = plasmid_ref.name,
                                     description = '')
@@ -349,15 +349,13 @@ def rotate_refs(reference, outputDir, restriction_enzyme_table):
             if cut_site == None:
                 sys.exit('Available enzyme not selected, exiting')
             
-            print(plasmid_ref.seq)
-            rotated_seq = selected_enzyme.catalyse(plasmid_ref.seq, linear = False)
-            #rotated_seq.name = pl
-            #rotated_seq = plasmid_ref.seq[cut_site-1:] + plasmid_ref.seq[:cut_site]
+            #print(plasmid_ref.seq)
+            #rotated_seq = selected_enzyme.catalyse(plasmid_ref.seq, linear = False)
+            rotated_seq = plasmid_ref.seq[cut_site-1:] + plasmid_ref.seq[:cut_site-1]
             new_plasmid = SeqRecord(rotated_seq)
             rotated_plasmids.append(new_plasmid)
 
     output_reference = outputDir + '/rotated_reference.fasta'
-    #with open('%s/rotated_reference.fasta' % outputDir, 'wb') as rotated:
     SeqIO.write(rotated_plasmids, output_reference, 'fasta')
         
     return output_reference
