@@ -164,7 +164,7 @@ def define_markers(file, k, max_regions):
         
         else:
             best_markers[item] = length_sorted_markers
-    
+
     return best_markers
 
 def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_extend,
@@ -223,7 +223,10 @@ def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_exten
                         subseq = record.seq[top_rev_alignment.aligned[0][0][0]:top_rev_alignment.aligned[0][-1][-1]]
                         if aligner.score(subseq, reverse_complement(str(marker_region[2]))) >= float(fine_alignment_score)*best_fine_score:
                             reads_dict[plasmid].append(record)
-                
+    
+    if not bool(reads_dict):
+        sys.exit("No reads were assigned to any plasmid!")
+    
     return reads_dict
 
 def write_bins(fastq_reads, reference, k, output_directory, match = 3,
@@ -254,7 +257,7 @@ def run_medaka_binned(fastq_reads, reference, k, output_directory, args,
                             context_map, fine_map, max_regions)
     
     if output_bins == None:
-        #If the alignment step was broken for single plasmid or (long unique seq), just pass the reads and referense to medaka
+        #If the alignment step was broken for single plasmid or long unique seq, just pass the reads and referense to medaka
         medaka_wrap.runMedaka(fastq_reads,
                               reference,
                               output_directory,
