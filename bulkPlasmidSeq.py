@@ -373,7 +373,7 @@ def trim_reads(reads, outputDir):
     
     subprocess.run(['porechop -i %s -o %s/trimmed_reads.fastq' % (reads, outputDir)], shell = True)
     
-    trimmed_reads = reads = '%s/trimmed_reads.fastq' % outputDir
+    trimmed_reads = '%s/trimmed_reads.fastq' % outputDir
     
     return trimmed_reads
 
@@ -382,7 +382,7 @@ def filterReads(reads, outputDir, maxLength, minLength, quality):
     '''
     Filters reads using NanoFilt. More options are available if you use NanoFilt itself please see
     https://github.com/wdecoster/nanofilt for more information. This program only allows for read length and q score 
-    filtering. If filtering first, please remember to change your input path for further analysis. 
+    filtering.
     '''
     print('----------------------------------\n')
     print('Filtering reads with NanoFilt: \nMin Length: %s \nMax Length: %s \nQ score: %s \n'
@@ -393,9 +393,9 @@ def filterReads(reads, outputDir, maxLength, minLength, quality):
     subprocess.run(['NanoFilt -q %s -l %s --maxlength %s %s> %s/filtered_reads.fastq' %
                     (quality, minLength, maxLength, reads, outputDir)], shell = True)
     
-    new_reads = 'filtered_reads.fastq'
+    filtered_reads = '%s/filtered_reads.fastq' % outputDir
     
-    return new_reads
+    return filtered_reads
 
 
 def takeScreenshots(reference, outputDir, igv):

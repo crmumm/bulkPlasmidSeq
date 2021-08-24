@@ -225,12 +225,15 @@ def write_bins(fastq_reads, reference, k, output_directory, match = 3,
     if reads_dict == None:
         return None
     
-    output_directory = output_directory.strip('/')
+#     output_directory = output_directory.strip('/')
     output_bins = []
     for plasmid in reads_dict:
         output_bins.append(output_directory+'/%s' % plasmid)
-        SeqIO.write(reads_dict[plasmid], output_directory+'/%s.fastq' % plasmid, "fastq")
-        
+        with open(output_directory+'/%s.fastq' % plasmid, 'w') as out_bin:
+            SeqIO.write(reads_dict[plasmid], out_bin, "fastq")
+            
+        out_bin.close()
+
     return output_bins
 
 def run_medaka_binned(fastq_reads, reference, k, output_directory, args,
