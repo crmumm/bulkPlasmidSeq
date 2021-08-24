@@ -141,21 +141,19 @@ def define_markers(file, k, max_regions):
                 marker_start = round(y[0]+k-4)
                 marker_end = round(y[1])
                 marker_seq = seqs[x][marker_start:marker_end]
-                print(marker_seq)
+
                 if marker_start-10 < 0:
                     print('Warning! Limited context available, markers near end of provided reference')
                     context_seq = seqs[x][0:marker_end+10]
-                    best_markers[x].append([(marker_start, marker_end), uniq_length, marker_seq, context_seq])
+
                 elif marker_end+10 > len(seqs[x]):
                     print('Warning! Limited context available, markers near end of provided reference')
                     context_seq = seqs[x][marker_start-10:]
-                    best_markers[x].append([(marker_start, marker_end), uniq_length, marker_seq, context_seq])
+
                 else:
-                    print("In else why")
                     context_seq = seqs[x][marker_start-10:marker_end+10]
-                    best_markers[x].append([(marker_start, marker_end), uniq_length, marker_seq, context_seq])
                 #print('Adding ' + context_seq + 'here')
-                #best_markers[x].append([(marker_start, marker_end), uniq_length, marker_seq, context_seq])
+                best_markers[x].append([(marker_start, marker_end), uniq_length, marker_seq, context_seq])
     
     for item in best_markers:
         unsorted_markers_list = best_markers[item]
@@ -167,7 +165,6 @@ def define_markers(file, k, max_regions):
         else:
             best_markers[item] = length_sorted_markers
     
-    print(best_markers)
     return best_markers
 
 def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_extend,
