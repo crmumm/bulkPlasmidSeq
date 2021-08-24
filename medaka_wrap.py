@@ -42,7 +42,7 @@ def runMedaka(reads, reference, outputDir, threads, model, igv):
     
     with open('%s/medaka_log.txt' % outputDir, 'wt') as log:
         # Quietly run medaka, make a medaka_log
-        #20210512 Added back -g (no fill option, want to see least helped results)
+        #20210512 Added back -g '-no gap fill'
         subprocess.run(['medaka_consensus',
                         '-g',
                         '-i', str(reads),
