@@ -359,7 +359,10 @@ def rotate_refs(reference, outputDir, restriction_enzyme_table):
             #print(plasmid_ref.seq)
             #rotated_seq = selected_enzyme.catalyse(plasmid_ref.seq, linear = False)
             rotated_seq = plasmid_ref.seq[cut_site-1:] + plasmid_ref.seq[:cut_site-1]
-            new_plasmid = SeqRecord(rotated_seq)
+            new_plasmid = SeqRecord(rotated_seq,
+                                   id = plasmid_ref.name,
+                                   description = '')
+            
             rotated_plasmids.append(new_plasmid)
 
     output_reference = outputDir + '/rotated_reference.fasta'
