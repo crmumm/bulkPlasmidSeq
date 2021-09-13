@@ -1,3 +1,4 @@
+
 '''
 Boyle Lab 2021
 
@@ -284,20 +285,21 @@ def rotate_refs(reference, outputDir, restriction_enzyme_table):
         re_table = open(restriction_enzyme_table, 'r')
         plasmid_cut_site = yaml.safe_load(re_table)
         for plasmid_ref in SeqIO.parse(reference, "fasta"):
-            
             try:
                 enzyme = plasmid_cut_site[plasmid_ref.name]['enzyme']
-                cut_site = plasmid_cut_site[plasmid_ref.name]['cut-site']
                 
             except KeyError:
                 #Catches if the plasmid was not provided. KeyError for enzyme
-                cut_site = 0
                 enzyme = None
-             
-            if enzyme == None and cut_site == None:
-                cut_site = 0
+
+            if enzyme == None:
+                try:
+                    cut_site = plasmid_cut_site[plasmid_ref.name]['cut-site']
+                                
+                except KeyError:
+                    cut_site = 1
                 
-            if enzyme != None:
+            elif enzyme != None:
                 batch = Restriction.RestrictionBatch([enzyme])
                 for provided_enzyme in batch:
                     search_site = batch.search(plasmid_ref.seq, linear = False)
@@ -306,8 +308,8 @@ def rotate_refs(reference, outputDir, restriction_enzyme_table):
                     if len(search_site[provided_enzyme]) > 1:
                         sys.exit('Provided enzyme has more than 1 cut site')
                     else:
-                        cut_site = int(search_site[provided_enzyme][0])
-                        
+                        cut_site = int(search_site[provided_enzyme][0])-1
+            
             rotated_seq = plasmid_ref.seq[cut_site-1:] + plasmid_ref.seq[:cut_site-1]
             new_plasmid = SeqRecord(rotated_seq, 
                                     id = plasmid_ref.name,
