@@ -106,8 +106,8 @@ def getArgs():
     biobin.add_argument('--mismatch', required = False, default = -6)
     biobin.add_argument('--gap_open', required = False, default = -10)
     biobin.add_argument('--gap_extend', required = False, default = -5)
-    biobin.add_argument('--context_map', required = False, default = 0.80)
-    biobin.add_argument('--fine_map', required = False, default = 0.95)
+    biobin.add_argument('--context_map', required = False, default = 0.70)
+    biobin.add_argument('--fine_map', required = False, default = 0.80)
     biobin.add_argument('--max_regions', required = False, default = 3, help = 'Maximum number of regions to align/score')
     
     biobin.add_argument('-re', '--restriction_enzyme', required = False, action = 'store_true', default = False,

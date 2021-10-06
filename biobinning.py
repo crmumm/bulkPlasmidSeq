@@ -231,7 +231,7 @@ def align_reads(fastq_reads, fasta_ref, k,  match, mismatch, gap_open, gap_exten
 
 def write_bins(fastq_reads, reference, k, output_directory, match = 3,
                mismatch = -6, gap_open = -10, gap_extend = -5,
-               context_map = 0.80, fine_map = 0.95, max_regions = 3):
+               context_map = 0.70, fine_map = 0.80, max_regions = 3):
     
     reads_dict = align_reads(fastq_reads, reference, k,  match, mismatch, gap_open, gap_extend, context_map, fine_map, max_regions)
     
